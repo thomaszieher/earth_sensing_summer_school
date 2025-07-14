@@ -1,0 +1,787 @@
+---
+title: "Process datacube"
+author: "Thomas Zieher"
+date: "2025-06-04"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r header,include=T}
+#####################################################
+##                                                 ##
+##      ######      #########  ##          ##      ##
+##      #######     ########   ##          ##      ##
+##      ##    ##    ##         ##          ##      ##
+##      ##   ##     ##         ##          ##      ##
+##      ######      ######     ##          ##      ##
+##      #######     #####      ##          ##      ##
+##      ##    ##    ##         ##    ##    ##      ##
+##      ##     ##   ##         ##   ####   ##      ##
+##      ##     ##   ##         ##  ##  ##  ##      ##
+##      ########    ##          ####    ####       ##
+##      #######     ##           ##      ##        ##
+##                                                 ##
+#####################################################
+##                                                 ##
+##  Author: Thomas Zieher                          ##
+##  Institute: Nat Haz, 6.3                        ##
+##  Date: 2023-01-23                               ##
+##  License: GNU GPL V.3 or later                  ##
+##                                                 ##
+#####################################################
+##  Description: ADD HERE
+##  Environment: ADD HERE
+#####################################################
+
+##set include=F to omit header in output
+
+```
+
+
+```{r setup,include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+##downloaded L2A-data with less than 30% cloud cover
+
+
+# install.packages("gdalcubes")
+# install.packages("dplyr")
+# install.packages("terra")
+# install.packages("sf")
+# renv::snapshot()
+
+library(gdalcubes)
+library(dplyr)
+library(terra)
+library(sf)
+library(raster)
+
+path="E:/summer_school_2025/S2"#"F:/RS"#/2023"#"D:/RS/2018"#
+outpath="E:/summer_school_2025"#"F:/RS/indices_maps_2021"#"F:/RS/indices_maps"##_2023"#
+
+
+
+##get meta data of downloaded scenes
+files=data.frame(filepath=list.files(path,pattern=".zip",recursive=T,full.names=T),
+                 filename=list.files(path,pattern=".zip",recursive=T))
+
+files["satellite"]=substr(files$filename,start=1,stop=3)
+files["type"]=substr(files$filename,start=5,stop=10)
+files["proc"]=substr(files$filename,start=28,stop=32)
+files["date"]=as.POSIXct(substr(files$filename,start=12,stop=26),format="%Y%m%dT%H%M%S",tz="UTC")
+files["tile"]=substr(files$filename,start=39,stop=44)
+files["day"]=as.POSIXct(substr(files$filename,start=12,stop=26),format="%Y%m%d",tz="UTC")
+files["month"]=as.numeric(format(files$date,format="%m"))
+files["year"]=as.numeric(format(files$date,format="%Y"))
+files=files[order(files$day),]
+
+##checks
+any(duplicated(files$date))
+files[duplicated(files$date)|duplicated(files$date,fromLast=T),]
+unique(files$proc)
+
+
+##limit to April-September
+#files=files[files$month%in%c(4:9),]
+
+##limit to 2018-2022
+#files=files[files$year%in%c(2018,2019,2020,2021),]
+
+
+plot(unique(files$day),rep(1,times=length(unique(files$day))),pch=20)
+length(unique(files$day))
+nrow(files)
+
+dates=unique(files$date)
+
+
+##colors
+colpal=function(n){colorRampPalette(c("red","orange","green","blue"))(n)}
+
+```
+
+
+***
+### Set up data cube
+
+```{r s2_cube,echo=F,warning=F,error=F}
+
+##set up datacube
+##https://github.com/appelmar/gdalcubes
+#collection_formats()
+
+##create image collection
+s2_coll=gdalcubes::create_image_collection(files$filepath,"Sentinel2_L2A")
+
+
+# ##set first view (overview)
+# v_overview=gdalcubes::cube_view(extent=s2_coll,dt="P1Y",dx=1000,dy=1000,srs="EPSG:32632",
+#                                 aggregation="median",resampling="near")#resampling="bilinear")
+# 
+# ##generate raster cube
+# s2_cube=gdalcubes::raster_cube(s2_coll,v_overview)
+# nbands(s2_cube)
+# names(s2_cube)
+# nx(s2_cube)
+# ny(s2_cube)
+# nt(s2_cube)
+# memsize(s2_cube)
+# dim(s2_cube)
+# dimensions(s2_cube)
+# dimension_bounds(s2_cube)
+# dimension_values(s2_cube)
+# bands(s2_cube)
+# as_json(s2_cube)
+# summary(s2_cube)
+
+
+##overview plot
+#system.time(plot(s2_cube,rgb=3:1,zlim=c(0,1200)))
+
+
+
+
+
+####COMPUTE MEDIAN INDICES
+##set detailed area with higher resolution
+v_subarea=gdalcubes::cube_view(#extent=list(left=660000,right=690000,bottom=5200000,top=5260000,
+  # t0="2023-01-01",t1="2023-12-31"),
+  # extent=list(left=538000,right=810000,bottom=5170000,top=5295000,
+  #t0="2023-04-01",t1="2023-09-30"),
+  #t0="2018-01-01",t1="2021-12-31"),
+  #t0="2018-01-01",t1="2018-12-31"),
+  #t0="2019-01-01",t1="2019-12-31"),
+  #t0="2020-01-01",t1="2020-12-31"),
+  # t0="2021-01-01",t1="2021-12-31"),
+  #t0="2018-01-01",t1="2023-12-31"),
+  extent=list(left=282000,right=289000,bottom=5145000,top=5152000,
+              t0="2019-01-01",t1="2024-12-31"),
+  
+  dt="P7D",#"P1M",
+  #dx=10,dy=10, 
+  dx=20,dy=20,
+  #srs="EPSG:32632",
+  srs="EPSG:32633",
+  aggregation="median",resampling="near"
+  #aggregation="mean",resampling="near"
+)
+
+# ##parallel processing
+# gdalcubes::gdalcubes_options(parallel=8)
+
+```
+
+
+
+***
+### Compute indices maps
+
+```{r indices_maps,echo=F,warning=F,error=F}
+
+##S-2 bands
+# Description   Standard	Spectral Range (nm)   Sentinel-2
+# Aerosols      A         400 - 455             B01
+# Blue          B         450 - 530             B02
+# Green         G         510 - 600             B03
+# Red           R         620 - 690             B04
+# Red Edge 1	  RE1       695 - 715             B05
+# Red Edge 2	  RE2       730 - 750             B06
+# Red Edge 3	  RE3       765 - 795             B07
+# NIR           N         760 - 900             B08
+# NIR 2         N2        850 - 880             B8A
+# Water Vapour  WV        930 - 960             B09
+# SWIR 1        S1        1550 - 1750           B11
+# SWIR 2        S2        2080 - 2350           B12
+
+
+
+# ##selected indices following https://github.com/awesome-spectral-indices/awesome-spectral-indices
+# ##EVI
+# ##EVI=g*(N-R)/(N+C1*R-C2*B+L)
+# ##coefficients g, C1, C2, L: https://kaflekrishna.com.np/blog-detail/enhanced-vegetation-index-evi-sentinel-2-image-google-earth-engine/
+# raster_cube(s2_coll,v_subarea) |>
+#   select_bands(c("B02","B04","B08")) |>
+#   apply_pixel(c("2.5*((B08-B04)/(B08+6*B04-7.5*B02+1))"),names="EVI") |>
+#   reduce_time("median(EVI)") |>
+#   write_tif() |>
+#   raster::raster()->evi
+# ##rescale EVI
+# evi_rescaled=rescale(evi,-1,1)
+# writeRaster(evi_rescaled,paste(outpath,"median_evi.tif",sep="/"),overwrite=T)
+# 
+# ##FCVI
+# ##FCVI=N-((R+G+B)/3.0)
+# raster_cube(s2_coll,v_subarea) |>
+#   select_bands(c("B02","B03","B04","B08")) |>
+#   apply_pixel(c("B08-((B02+B03+B04)/3.0)"),names="FCVI") |>
+#   reduce_time("median(FCVI)") |>
+#   write_tif() |>
+#   raster::raster()->fcvi
+# ##rescale FCVI
+# fcvi_rescaled=rescale(fcvi,-1,1)
+# writeRaster(fcvi_rescaled,paste(outpath,"median_fcvi.tif",sep="/"),overwrite=T)
+# 
+# ##IRECI (Frampton et al. 2013)
+# ##IRECI=(RE3-R)/(RE1/RE2)
+# raster_cube(s2_coll,v_subarea) |>
+#   select_bands(c("B04","B05","B06","B07")) |>
+#   apply_pixel(c("(B07-B04)/(B05/B06)"),names="IRECI") |>
+#   reduce_time("median(IRECI)") |>
+#   write_tif() |>
+#   raster::raster()->ireci
+# ##rescale IRECI
+# ireci_rescaled=rescale(ireci,-1,1)
+# writeRaster(ireci_rescaled,paste(outpath,"median_ireci.tif",sep="/"),overwrite=T)
+# 
+# ##MSAVI
+# ##MSAVI=0.5 * (2.0 * N + 1 - (((2 * N + 1) ** 2) - 8 * (N - R)) ** 0.5)
+# raster_cube(s2_coll,v_subarea) |>
+#   select_bands(c("B04","B08")) |>
+#   apply_pixel(c("0.5*(2.0*B08+1.0-(((2*B08+1)^2.0)-8.0*(B08-B04))^0.5)"),names="MSAVI") |>
+#   reduce_time("median(MSAVI)") |>
+#   write_tif() |>
+#   raster::raster()->msavi
+# writeRaster(msavi,paste(outpath,"median_msavi.tif",sep="/"),overwrite=T)
+# 
+# ##MSI
+# ##MSI=S1/N
+# raster_cube(s2_coll,v_subarea) |>
+#   select_bands(c("B08","B11")) |>
+#   apply_pixel(c("B11/B08"),names="MSI") |>
+#   reduce_time("median(MSI)") |>
+#   write_tif() |>
+#   raster::raster()->msi
+# writeRaster(msi,paste(outpath,"median_msi.tif",sep="/"),overwrite=T)
+# 
+# ##NDMI
+# ##NDMI=(N-S1)/(N+S1)
+# raster_cube(s2_coll,v_subarea) |>
+#   select_bands(c("B08","B11")) |>
+#   apply_pixel(c("(B08-B11)/(B08+B11)"),names="NDMI") |>
+#   reduce_time("median(NDMI)") |>
+#   write_tif() |>
+#   raster::raster()->ndmi
+# writeRaster(ndmi,paste(outpath,"median_ndmi.tif",sep="/"),overwrite=T)
+# 
+# ##NDREI
+# ##NDREI=(N-RE1)/(N+RE1)
+# raster_cube(s2_coll,v_subarea) |>
+#   select_bands(c("B05","B08")) |>
+#   apply_pixel(c("(B08-B05)/(B08+B05)"),names="NDRE") |>
+#   reduce_time("median(NDRE)") |>
+#   write_tif() |>
+#   raster::raster()->ndrei
+# writeRaster(ndrei,paste(outpath,"median_ndrei.tif",sep="/"),overwrite=T)
+# 
+# ##NIRv
+# ##NIRv=((N-R)/(N+R))*N
+# raster_cube(s2_coll,v_subarea) |>
+#   select_bands(c("B04","B08")) |>
+#   apply_pixel(c("((B08-B04)/(B08+B04))*B08"),names="NIRv") |>
+#   reduce_time("median(NIRv)") |>
+#   write_tif() |>
+#   raster::raster()->nirv
+# ##rescale NIRv
+# nirv_rescaled=rescale(nirv,-1,1)
+# writeRaster(nirv_rescaled,paste(outpath,"median_nirv.tif",sep="/"),overwrite=T)
+# 
+# ##NMDI
+# ##NMDI=(N-(S1-S2))/(N+(S1-S2))
+# raster_cube(s2_coll,v_subarea) |>
+#   select_bands(c("B08","B11","B12")) |>
+#   apply_pixel(c("(B08-(B11-B12))/(B08+(B11-B12))"),names="NMDI") |>
+#   reduce_time("median(NMDI)") |>
+#   write_tif() |>
+#   raster::raster()->nmdi
+# writeRaster(nmdi,paste(outpath,"median_nmdi.tif",sep="/"),overwrite=T)
+# 
+# ##RENDVI
+# ##RENDVI=(RE2-RE1)/(RE2+RE1)
+# raster_cube(s2_coll,v_subarea) |>
+#   select_bands(c("B11","B12")) |>
+#   apply_pixel(c("(B12-B11)/(B12+B11)"),names="RENDVI") |>
+#   reduce_time("median(RENDVI)") |>
+#   write_tif() |>
+#   raster::raster()->rendvi
+# writeRaster(rendvi,paste(outpath,"median_rendvi.tif",sep="/"),overwrite=T)
+# 
+# ##S2REP (Frampton et al. 2013)
+# ##S2REP=705.0+35.0*((((RE3+R)/2.0)-RE1)/(RE2-RE1))
+# raster_cube(s2_coll,v_subarea) |>
+#   select_bands(c("B04","B05","B06","B07")) |>
+#   apply_pixel(c("705.0+35.0*((((B07+B04)/2.0)-B05)/(B06-B05))"),names="S2REP") |>
+#   reduce_time("median(S2REP)") |>
+#   write_tif() |>
+#   raster::raster()->s2rep
+# ##rescale S2REP
+# s2rep_rescaled=rescale(s2rep,-1,1)
+# writeRaster(s2rep_rescaled,paste(outpath,"median_s2rep.tif",sep="/"),overwrite=T)
+# 
+# ##SAVI
+# ##SAVI=(1.0+L)*(N-R)/(N+R+L)
+# raster_cube(s2_coll,v_subarea) |>
+#   select_bands(c("B04","B08")) |>
+#   apply_pixel(c("(1.0+0.19)*(B08-B04)/(B08+B04+0.19)"),names="SAVI") |>
+#   reduce_time("median(SAVI)") |>
+#   write_tif() |>
+#   raster::raster()->savi
+# writeRaster(savi,paste(outpath,"median_savi.tif",sep="/"),overwrite=T)
+# 
+# ##GNDVI
+# ##GNDVI=(N-G)/(N+G)
+# raster_cube(s2_coll,v_subarea) |>
+#   select_bands(c("B03","B08")) |>
+#   apply_pixel(c("(B08-B03)/(B08+B03)"),names="GNDVI") |>
+#   reduce_time("median(GNDVI)") |>
+#   write_tif() |>
+#   raster::raster()->gndvi
+# writeRaster(gndvi,paste(outpath,"median_gndvi.tif",sep="/"),overwrite=T)
+# 
+# ##GVMI
+# ##GVMI=((N+0.1)-(S2+0.02))/((N+0.1)+(S2+0.02))
+# raster_cube(s2_coll,v_subarea) |>
+#   select_bands(c("B08","B12")) |>
+#   apply_pixel(c("((B08+0.1)-(B12+0.02))/((B08+0.1)+(B12+0.02))"),names="GVMI") |>
+#   reduce_time("median(GVMI)") |>
+#   write_tif() |>
+#   raster::raster()->gvmi
+# writeRaster(gvmi,paste(outpath,"median_gvmi.tif",sep="/"),overwrite=T)
+# 
+# ##NDVI
+# ##NDVI=(N-R)/(N+R)
+# raster_cube(s2_coll,v_subarea) |>
+#   select_bands(c("B04","B08")) |>
+#   apply_pixel(c("(B08-B04)/(B08+B04)"),names="NDVI") |>
+#   reduce_time("median(NDVI)") |>
+#   write_tif() |>
+#   raster::raster()->ndvi
+# writeRaster(ndvi,paste(outpath,"median_ndvi.tif",sep="/"),overwrite=T)
+
+
+# ##re-read
+# evi_rescaled=raster::raster(paste(outpath,"median_evi.tif",sep="/"))
+# fcvi_rescaled=raster::raster(paste(outpath,"median_fcvi.tif",sep="/"))
+# ireci_rescaled=raster::raster(paste(outpath,"median_ireci.tif",sep="/"))
+# msavi=raster::raster(paste(outpath,"median_msavi.tif",sep="/"))
+# msi=raster::raster(paste(outpath,"median_msi.tif",sep="/"))
+# ndmi=raster::raster(paste(outpath,"median_ndmi.tif",sep="/"))
+# ndrei=raster::raster(paste(outpath,"median_ndrei.tif",sep="/"))
+# nirv_rescaled=raster::raster(paste(outpath,"median_nirv.tif",sep="/"))
+# nmdi=raster::raster(paste(outpath,"median_nmdi.tif",sep="/"))
+# rendvi=raster::raster(paste(outpath,"median_rendvi.tif",sep="/"))
+# s2rep_rescaled=raster::raster(paste(outpath,"median_s2rep.tif",sep="/"))
+# savi=raster::raster(paste(outpath,"median_savi.tif",sep="/"))
+# gndvi=raster::raster(paste(outpath,"median_gndvi.tif",sep="/"))
+# gvmi=raster::raster(paste(outpath,"median_gvmi.tif",sep="/"))
+ndvi=raster::raster(paste(outpath,"median_ndvi.tif",sep="/"))
+
+
+
+##check stats at points
+#whh_pts=sf::st_read("D:/Bundesforschungszentrum fuer Wald/Klebinder Klaus - 23030_WINALP21_schwereDaten/Modell/00_classified_results/whh_points_rew_qu.geojson")
+#whh_pts_utm=sf::st_transform(whh_pts,crs="EPSG:32632")
+whh_pts=sf::st_read(paste(outpath,"test_points.gpkg",sep="/"))
+whh_pts_utm=sf::st_transform(whh_pts,crs="EPSG:32633")
+
+# ##indices stack
+# #indices=raster::stack(x=c(evi,fcvi,ireci,msavi,msi,ndmi,ndrei,nirv,nmdi,rendvi,s2rep,savi,gndvi,gvmi,ndvi
+# #))
+# ##rescaled indices
+# indices=raster::stack(x=c(evi_rescaled,fcvi_rescaled,ireci_rescaled,msavi,msi,ndmi,ndrei,nirv_rescaled,nmdi,rendvi,s2rep_rescaled,savi,gndvi,gvmi,ndvi
+# ))
+# 
+# ##extract median indices within buffer around whh points
+# whh_pts_utm=cbind(whh_pts_utm,raster::extract(indices,whh_pts_utm,buffer=20,fun="median"))
+
+
+# #boxplot(whh_pts_utm$raster..extract.indices..whh_pts_utm..buffer...20..fun....median..~whh_pts_utm$whh_class,ylim=c(1.5,4.5),xlab="WHH class (model)",ylab="Enhanced vegetation index (EVI)")
+# #boxplot(whh_pts_utm$median_evi~whh_pts_utm$whh_class,ylim=c(1.5,4.5),xlab="WHH class (model)",ylab="Enhanced vegetation index (EVI)")
+# boxplot(whh_pts_utm$median_evi~whh_pts_utm$whh_class,ylim=c(0.259,0.261),xlab="WHH class (model)",ylab="Enhanced vegetation index (EVI)")
+# boxplot(whh_pts_utm$median_fcvi~whh_pts_utm$whh_class)
+# boxplot(whh_pts_utm$median_ireci~whh_pts_utm$whh_class)
+# boxplot(whh_pts_utm$median_msavi~whh_pts_utm$whh_class)
+# boxplot(whh_pts_utm$median_msi~whh_pts_utm$whh_class,ylim=c(0.4,1))
+# boxplot(whh_pts_utm$median_ndmi~whh_pts_utm$whh_class,ylim=c(0,0.4))
+# boxplot(whh_pts_utm$median_ndrei~whh_pts_utm$whh_class)
+# boxplot(whh_pts_utm$median_nirv~whh_pts_utm$whh_class)
+# boxplot(whh_pts_utm$median_ndmi~whh_pts_utm$whh_class)
+# boxplot(whh_pts_utm$median_rendvi~whh_pts_utm$whh_class)
+# boxplot(whh_pts_utm$median_s2rep~whh_pts_utm$whh_class)
+# boxplot(whh_pts_utm$median_savi~whh_pts_utm$whh_class)
+# boxplot(whh_pts_utm$median_gndvi~whh_pts_utm$whh_class)
+# boxplot(whh_pts_utm$median_gvmi~whh_pts_utm$whh_class)
+# boxplot(whh_pts_utm$median_ndvi~whh_pts_utm$whh_class)
+
+
+#boxplot(whh_pts_utm$raster..extract.indices..whh_pts_utm..buffer...20..fun....median..~whh_pts_utm$id,ylim=c(1.5,4.5),xlab="WHH class (model)",ylab="Enhanced vegetation index (EVI)")
+#boxplot(whh_pts_utm$median_evi~whh_pts_utm$id,ylim=c(1.5,4.5),xlab="WHH class (model)",ylab="Enhanced vegetation index (EVI)")
+# boxplot(whh_pts_utm$median_evi~whh_pts_utm$id,xlab="WHH class (model)",ylab="Enhanced vegetation index (EVI)")
+# boxplot(whh_pts_utm$median_fcvi~whh_pts_utm$id)
+# boxplot(whh_pts_utm$median_ireci~whh_pts_utm$id)
+# boxplot(whh_pts_utm$median_msavi~whh_pts_utm$id)
+# boxplot(whh_pts_utm$median_msi~whh_pts_utm$id,ylim=c(0.4,1))
+# boxplot(whh_pts_utm$median_ndmi~whh_pts_utm$id,ylim=c(0,0.4))
+# boxplot(whh_pts_utm$median_ndrei~whh_pts_utm$id)
+# boxplot(whh_pts_utm$median_nirv~whh_pts_utm$id)
+# boxplot(whh_pts_utm$median_ndmi~whh_pts_utm$id)
+# boxplot(whh_pts_utm$median_rendvi~whh_pts_utm$id)
+# boxplot(whh_pts_utm$median_s2rep~whh_pts_utm$id)
+# boxplot(whh_pts_utm$median_savi~whh_pts_utm$id)
+# boxplot(whh_pts_utm$median_gndvi~whh_pts_utm$id)
+# boxplot(whh_pts_utm$median_gvmi~whh_pts_utm$id)
+# boxplot(whh_pts_utm$median_ndvi~whh_pts_utm$id)
+# 
+# 
+# 
+# pairs(data.frame(whh_pts_utm)[,c("median_evi","median_fcvi","median_ireci","median_msavi",
+#                                  "median_msi","median_ndmi","median_ndrei","median_nirv",
+#                                  "median_ndmi","median_rendvi","median_s2rep",
+#                                  "median_savi","median_gndvi","median_gvmi","median_ndvi")])
+
+
+
+##TODO: check depending on tree species
+
+```
+
+
+
+***
+### Time series analyses
+
+```{r ts,echo=F,warning=F,error=F}
+
+
+# ##generate indices cubes
+# ##EVI
+# ##EVI=g*(N-R)/(N+C1*R-C2*B+L)
+# evi_cube=raster_cube(s2_coll,v_subarea) |>
+#   select_bands(c("B02","B04","B08")) |>
+#   apply_pixel(c("2.5*((B08-B04)/(B08+6*B04-7.5*B02+1))"),names="EVI")
+# 
+# ##FCVI
+# ##FCVI=N-((R+G+B)/3.0)
+# fcvi_cube=raster_cube(s2_coll,v_subarea) |>
+#   select_bands(c("B02","B03","B04","B08")) |>
+#   apply_pixel(c("B08-((B02+B03+B04)/3.0)"),names="FCVI")
+# 
+# ##IRECI (Frampton et al. 2013)
+# ##IRECI=(RE3-R)/(RE1/RE2)
+# ireci_cube=raster_cube(s2_coll,v_subarea) |>
+#   select_bands(c("B04","B05","B06","B07")) |>
+#   apply_pixel(c("(B07-B04)/(B05/B06)"),names="IRECI")
+# 
+# ##MSAVI
+# ##MSAVI=0.5 * (2.0 * N + 1 - (((2 * N + 1) ** 2) - 8 * (N - R)) ** 0.5)
+# msavi_cube=raster_cube(s2_coll,v_subarea) |>
+#   select_bands(c("B04","B08")) |>
+#   apply_pixel(c("0.5*(2.0*B08+1.0-(((2*B08+1)^2.0)-8.0*(B08-B04))^0.5)"),names="MSAVI")
+# 
+# ##MSI
+# ##MSI=S1/N
+# msi_cube=raster_cube(s2_coll,v_subarea) |>
+#   select_bands(c("B08","B11")) |>
+#   apply_pixel(c("B11/B08"),names="MSI")
+# 
+# ##NDMI
+# ##NDMI=(N-S1)/(N+S1)
+# ndmi_cube=raster_cube(s2_coll,v_subarea) |>
+#   select_bands(c("B08","B11")) |>
+#   apply_pixel(c("(B08-B11)/(B08+B11)"),names="NDMI")
+# 
+# ##NDREI
+# ##NDREI=(N-RE1)/(N+RE1)
+# ndrei_cube=raster_cube(s2_coll,v_subarea) |>
+#   select_bands(c("B05","B08")) |>
+#   apply_pixel(c("(B08-B05)/(B08+B05)"),names="NDRE")
+# 
+# ##NIRv
+# ##NIRv=((N-R)/(N+R))*N
+# nirv_cube=raster_cube(s2_coll,v_subarea) |>
+#   select_bands(c("B04","B08")) |>
+#   apply_pixel(c("((B08-B04)/(B08+B04))*B08"),names="NIRv")
+# 
+# ##NMDI
+# ##NMDI=(N-(S1-S2))/(N+(S1-S2))
+# ndmi_cube=raster_cube(s2_coll,v_subarea) |>
+#   select_bands(c("B08","B11","B12")) |>
+#   apply_pixel(c("(B08-(B11-B12))/(B08+(B11-B12))"),names="NMDI")
+# 
+# ##RENDVI
+# ##RENDVI=(RE2-RE1)/(RE2+RE1)
+# rendvi_cube=raster_cube(s2_coll,v_subarea) |>
+#   select_bands(c("B11","B12")) |>
+#   apply_pixel(c("(B12-B11)/(B12+B11)"),names="RENDVI")
+# 
+# ##S2REP (Frampton et al. 2013)
+# ##S2REP=705.0+35.0*((((RE3+R)/2.0)-RE1)/(RE2-RE1))
+# s2rep_cube=raster_cube(s2_coll,v_subarea) |>
+#   select_bands(c("B04","B05","B06","B07")) |>
+#   apply_pixel(c("705.0+35.0*((((B07+B04)/2.0)-B05)/(B06-B05))"),names="S2REP")
+# 
+# ##SAVI
+# ##SAVI=(1.0+L)*(N-R)/(N+R+L)
+# savi_cube=raster_cube(s2_coll,v_subarea) |>
+#   select_bands(c("B04","B08")) |>
+#   apply_pixel(c("(1.0+0.19)*(B08-B04)/(B08+B04+0.19)"),names="SAVI")
+# 
+# ##GNDVI
+# ##GNDVI=(N-G)/(N+G)
+# gndvi_cube=raster_cube(s2_coll,v_subarea) |>
+#   select_bands(c("B03","B08")) |>
+#   apply_pixel(c("(B08-B03)/(B08+B03)"),names="GNDVI")
+# 
+# ##GVMI
+# ##GVMI=((N+0.1)-(S2+0.02))/((N+0.1)+(S2+0.02))
+# gvmi_cube=raster_cube(s2_coll,v_subarea) |>
+#   select_bands(c("B08","B12")) |>
+#   apply_pixel(c("((B08+0.1)-(B12+0.02))/((B08+0.1)+(B12+0.02))"),names="GVMI")
+
+##NDVI
+##NDVI=(N-R)/(N+R)
+ndvi_cube=gdalcubes::raster_cube(s2_coll,v_subarea) |>
+  select_bands(c("B04","B08")) |>
+  apply_pixel(c("(B08-B04)/(B08+B04)"),names="NDVI")
+
+#gdalcubes::write_tif(ndvi_cube,paste(outpath,"ndvi_cube",sep="/"))
+#gdalcubes::write_ncdf(ndvi_cube,"D:/test.nc",overwrite=T)
+
+
+
+
+
+# ts_single=gdalcubes::extract_geom(ndvi_cube,whh_pts_utm,warnings=F)
+# ts_single["date"]=as.POSIXct(ts_single$time)
+# ts_single=ts_single[order(ts_single$date),]
+# 
+# plot(NA,NA,xlim=c(as.POSIXct("2019-01-01"),as.POSIXct("2024-12-31")),ylim=c(0,0.5),axes=F,xlab="",ylab="NDVI")
+# xticks=seq(as.POSIXct("2019-01-01"),as.POSIXct("2024-12-31"),by="3 months")
+# axis(side=1,at=xticks,labels=format(xticks,format="%Y-%m"))
+# axis(side=2,las=1)
+# col=c(rep("darkgreen",times=4),rep("red",times=4))
+# for (fid in unique(ts_single$FID)){
+#   ts_single_sub=ts_single[ts_single$FID==fid,]
+#   lines(as.POSIXct(ts_single_sub$date),ts_single_sub$NDVI,col=col[fid],lwd=2)
+# }
+
+
+
+
+
+
+
+
+
+
+##minimum number of valid non-NA scenes per year for time series
+min_scenes=10
+##minimum number of points for linear regression
+minreg=5
+
+
+
+##set time zone
+timezone="UTC"
+
+
+# ##load stack
+# ndvi_stack=terra::rast(list.files(paste(outpath,"ndvi_cube",sep="/"),pattern=".tif$",full.names=T))
+# 
+# ##get dates
+# dates=as.POSIXct(gdalcubes::extract_geom(ndvi_cube,st_as_sf(data.frame(id="P1",xcoord=v_subarea$space$left+(v_subarea$space$dx/2.0),ycoord=v_subarea$space$bottom+(v_subarea$space$dy/2.0)),coords=c("xcoord","ycoord"),crs="epsg:32633"))[,2],tz=timezone)
+
+##apply for NDVI raster
+##get coordinates
+coords_x=seq(v_subarea$space$left+(v_subarea$space$dx/2.0),v_subarea$space$right-(v_subarea$space$dx/2.0),v_subarea$space$dx)
+coords_y=seq(v_subarea$space$bottom+(v_subarea$space$dy/2.0),v_subarea$space$top-(v_subarea$space$dy/2.0),v_subarea$space$dy)
+
+total=length(coords_x)*length(coords_y)
+
+##test
+# xcoord=coords_x[100]
+# ycoord=coords_y[100]
+# test=sample(1:length(coords_x),size=10)
+# coords_x=coords_x[test]
+# coords_y=coords_y[test]
+
+
+
+
+# ##test
+# v_test=gdalcubes::cube_view(#extent=list(left=660000,right=690000,bottom=5200000,top=5260000,
+#   # t0="2023-01-01",t1="2023-12-31"),
+#   # extent=list(left=538000,right=810000,bottom=5170000,top=5295000,
+#   #t0="2023-04-01",t1="2023-09-30"),
+#   #t0="2018-01-01",t1="2021-12-31"),
+#   #t0="2018-01-01",t1="2018-12-31"),
+#   #t0="2019-01-01",t1="2019-12-31"),
+#   #t0="2020-01-01",t1="2020-12-31"),
+#   # t0="2021-01-01",t1="2021-12-31"),
+#   #t0="2018-01-01",t1="2023-12-31"),
+#   extent=#list(left=282000,right=289000,bottom=5145000,top=5152000,
+#     #      t0="2019-01-01",t1="2024-12-31"),
+#     list(left=282000,right=282040,bottom=5145000,top=5145060,
+#          t0="2019-01-01",t1="2024-12-31"),
+#   
+#   dt="P7D",#"P1M",
+#   #dx=10,dy=10, 
+#   dx=20,dy=20,
+#   #srs="EPSG:32632",
+#   srs="EPSG:32633",
+#   aggregation="median",resampling="near"
+#   #aggregation="mean",resampling="near"
+# )
+# 
+# 
+# ndvi_cube=gdalcubes::raster_cube(s2_coll,v_test) |>
+#   select_bands(c("B04","B08")) |>
+#   apply_pixel(c("(B08-B04)/(B08+B04)"),names="NDVI")
+# 
+# coords_x=seq(v_test$space$left+(v_test$space$dx/2.0),v_test$space$right-(v_test$space$dx/2.0),v_test$space$dx)
+# coords_y=seq(v_test$space$bottom+(v_test$space$dy/2.0),v_test$space$top-(v_test$space$dy/2.0),v_test$space$dy)
+# 
+# total=length(coords_x)*length(coords_y)
+
+
+i=1
+# xcoord=coords_x[1]
+# ycoord=coords_y[1]
+gdalcubes::gdalcubes_options(parallel=8,show_progress=F)
+var="NDVI"
+quant=0.9
+
+
+files=data.frame(files=list.files(outpath,pattern="ndvi_analyses"))
+files["ycoord"]=substr(files$files,start=15,stop=21)
+coords_y=coords_y[!coords_y%in%files$ycoord]
+
+for (ycoord in coords_y){
+  print(ycoord)
+  collection_ndvi=data.frame()
+  for (xcoord in coords_x){
+    #print(xcoord)
+    if (i%%1000==0) print(sprintf("processing %i: %i, %i",i,xcoord,ycoord))
+    
+    ##get clean time series
+    pt=st_as_sf(data.frame(id="P1",xcoord=xcoord,ycoord=ycoord),coords=c("xcoord","ycoord"),crs="epsg:32633")
+    
+    ##version with terra::extract
+    # start=Sys.time()
+    #ts_single=data.frame(date=dates,NDVI=na.omit(t(terra::extract(ndvi_stack,pt))))
+    #Sys.time()-start
+    
+    # start=Sys.time()
+    ts_single=suppressWarnings(suppressMessages(gdalcubes::extract_geom(ndvi_cube,pt)))
+    ts_single["date"]=as.POSIXct(ts_single$time)
+    # Sys.time()-start
+    
+    ts_single=ts_single[order(ts_single$date),]
+    
+    ##get annual maxima (--> better seasonal?)
+    ts_single["year"]=format(ts_single$date,format="%Y")
+    ann_max=data.frame()
+    #year="2022"
+    for (year in unique(ts_single$year)){
+      ts_single_sub=ts_single[ts_single$year==year,]
+      if (nrow(ts_single_sub)>min_scenes){
+        selection=ts_single_sub[,c(var)]>=quantile(ts_single_sub[,c(var)],quant,na.rm=T)
+        #selection[is.na(ts_single_sub[,c(var)]>=quantile(ts_single_sub[,c(var)],quant,na.rm=T))]=F
+        ann_max=rbind(ann_max,ts_single_sub[selection,])
+      }
+    }
+    
+    #plot(ts_single$date,ts_single[,c(var)],type="l",col="dark green",lwd=2,ylim=c(-1,1))
+    #points(ann_max$date,ann_max[,c(var)],col="red",pch=20)
+    
+    if (nrow(ann_max)>=minreg){
+      ##trend
+      linfit=lm(ann_max[,c(var)]~ann_max$date)
+      #abline(linfit)
+      trend=coefficients(summary(linfit))[2,1]*60*60*24*365 ##1/yr
+      r2=summary(linfit)$r.squared
+      median_value=median(ann_max[,c(var)])
+      mean_value=mean(ann_max[,c(var)])
+      sd_value=sd(ann_max[,c(var)])
+    }else{
+      trend=NA
+      r2=NA
+      median_value=NA
+      mean_value=NA
+      sd_value=NA
+    }
+    
+    collection_ndvi=rbind(collection_ndvi,data.frame(x=xcoord,
+                                                     y=ycoord,
+                                                     trend=trend,
+                                                     r2=r2,
+                                                     median=median_value,
+                                                     mean=mean_value,
+                                                     sd=sd_value))
+    ##count
+    i=i+1
+    
+  }
+  
+  ##write each raster row
+  write.table(collection_ndvi,paste(outpath,sprintf("ndvi_analyses_%i.csv",ycoord),sep="/"),sep=";",quote=F,row.names=F)
+  
+}
+
+
+
+```
+
+
+
+***
+### Write raster
+
+```{r write,echo=F,warning=F,error=F}
+
+
+
+
+
+
+write.table(collection_ndvi,"ndvi_trends.txt",sep=";",quote=F,row.names=F)
+collection_ndvi=read.table("ndvi_trends.txt",sep=";",header=T)
+
+
+##rasterize
+er=terra::rast(ext(ndvi),resolution=res(ndvi))
+terra::crs(er)=terra::crs(ndvi)
+trend_filled=rep(NA,times=(nrow(ndvi)*ncol(ndvi)))
+trend_filled[0:nrow(collection_ndvi)]=collection_ndvi$trend
+terra::values(er)=matrix(trend_filled,nrow=ncol(ndvi),ncol=nrow(ndvi))
+
+plot(er)
+terra::writeRaster(er,"D:/test.tif")
+
+# ##convert to raster
+# ##trend
+# trend_rast=rasterFromXYZ(collection_ndvi[,c("x","y","trend")],res=xres(ndvi),crs=crs(ndvi))
+# plot(trend_rast)
+# writeRaster(trend_rast,"NDVI_trend.tif",overwrite=T)
+# 
+# ##r2
+# r2_rast=rasterFromXYZ(collection_ndvi[,c("x","y","r2")],res=xres(ndvi),crs=crs(ndvi))
+# plot(r2_rast)
+# writeRaster(r2_rast,"NDVI_r2.tif",overwrite=T)
+# 
+# ##median
+# median_rast=rasterFromXYZ(collection_ndvi[,c("x","y","median")],res=xres(ndvi),crs=crs(ndvi))
+# plot(median_rast)
+# writeRaster(median_rast,"NDVI_median.tif",overwrite=T)
+# 
+# ##mean
+# mean_rast=rasterFromXYZ(collection_ndvi[,c("x","y","mean")],res=xres(ndvi),crs=crs(ndvi))
+# plot(mean_rast)
+# writeRaster(mean_rast,"NDVI_mean.tif",overwrite=T)
+
+
+
+
+```
+
+
