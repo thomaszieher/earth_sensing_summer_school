@@ -3,6 +3,8 @@ title: "Prepare ERA5 data"
 author: "Thomas Zieher"
 date: "2025-06-04"
 output: html_document
+editor_options: 
+  chunk_output_type: console
 ---
 
 ```{r header,include=T}
@@ -24,12 +26,12 @@ output: html_document
 ##                                                 ##
 ##  Author: Thomas Zieher                          ##
 ##  Institute: Nat Haz, 6.3                        ##
-##  Date: 2023-01-23                               ##
+##  Date: 2025-07-23                               ##
 ##  License: GNU GPL V.3 or later                  ##
 ##                                                 ##
 #####################################################
-##  Description: ADD HERE
-##  Environment: ADD HERE
+##  Description: Prepare ERA5 meteo time series for LWF-Brook90
+##  Environment: renv
 #####################################################
 
 ##set include=F to omit header in output
@@ -37,411 +39,124 @@ output: html_document
 ```
 
 
-```{r setup,include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+```{r setup}
+knitr::opts_chunk$set(echo=T)
 
-root="D:/OneDrive - Bundesforschungszentrum fuer Wald/05_projects/18_Summer_School_Italy/01_data/era5"
-
+setwd("../../")
+root=paste(getwd(),"data/era5",sep="/")
 
 library(ncdf4)
 library(data.table)
 
+timezone="UTC"
+
 ```
 
 
-***
-### Prepare the single nc files
-Workaround??
 
+***
+### Process the single ERA5 nc files
 
 ```{r prep,echo=F,message=F,warning=F,error=F}
 
-##2019
-timezone="UTC"
-dates=seq(as.POSIXct("2019-01-01 01:00:00"),as.POSIXct("2019-12-31 23:00:00"),by="hour",tz=timezone)
-
-
-nc_tmean="e8c7b8a7f522650a4a4fc38498985501.nc"
-ncin_tmean=nc_open(paste(root,nc_tmean,sep="/"))
-tmean=ncvar_get(ncin_tmean,"t2m")-273.15  ##deg C
-
-nc_prec="b822d9df906b558f4f2bd49c7024268.nc"
-ncin_prec=nc_open(paste(root,nc_prec,sep="/"))
-prec=ncvar_get(ncin_prec,"tp")*1000.0  ##mm
-
-nc_tmin="1ea229db91944bf79847c7be46e557a4.nc"
-ncin_tmin=nc_open(paste(root,nc_tmin,sep="/"))
-tmin=ncvar_get(ncin_tmin,"mn2t")-273.15  ##deg C
-
-nc_tmax="26a924c758c5f56d3b050b6531c716f8.nc"
-ncin_tmax=nc_open(paste(root,nc_tmax,sep="/"))
-tmax=ncvar_get(ncin_tmax,"mx2t")-273.15  ##deg C
-
-nc_globrad="2c3837464ba35fe5d67dee82d0d75cab.nc"
-ncin_globrad=nc_open(paste(root,nc_globrad,sep="/"))
-globrad=ncvar_get(ncin_globrad,"ssrd")/1000000  ##MJ/m2
-
-nc_tdew="c8de5201213c3321cc5c42f131d28b8c.nc"
-ncin_tdew=nc_open(paste(root,nc_tdew,sep="/"))
-tdew=ncvar_get(ncin_tdew,"d2m")-273.15  ##deg C
-
-##computation of vapour pressure based on
-##Murray (1967) On the computation of saturation vapor pressure
-vappres=ifelse(tdew>0,
-               0.61078*exp(17.26937*(tdew)/(tdew+237.3)),
-               0.61078*exp(21.87459*(tdew)/(tdew+265.5)))
-
-
-nc_u10="3633839f41cf855ba63b9cd8e5fa8d8.nc"
-ncin_u10=nc_open(paste(root,nc_u10,sep="/"))
-wind_u=ncvar_get(ncin_u10,"u10")
-
-nc_v10="a7ce908d3fd43a263fd5677c741b1899.nc"
-ncin_v10=nc_open(paste(root,nc_v10,sep="/"))
-wind_v=ncvar_get(ncin_v10,"v10")
-windspeed=(wind_u^2+wind_u^2)^0.5
-
-meteo_hourly_2019=data.table(dates=dates,
-                             tmean=tmean,
-                             prec=prec,
-                             tmin=tmin,
-                             tmax=tmax,
-                             globrad=globrad,
-                             vappres=vappres,
-                             windspeed=windspeed)
-
-head(meteo_hourly_2019)
-summary(meteo_hourly_2019)
-
-meteo_hourly_2019$date=as.Date(format(meteo_hourly_2019$dates,format="%Y-%m-%d",tz=timezone))
-
-
-
-##2020
-timezone="UTC"#Etc/GMT-1"
-dates=seq(as.POSIXct("2020-01-01 01:00:00"),as.POSIXct("2020-12-31 23:00:00"),by="hour",tz=timezone)
-
-
-nc_tmean="873afbd51f97705cabc4a9de96ff0f17.nc"
-ncin_tmean=nc_open(paste(root,nc_tmean,sep="/"))
-tmean=ncvar_get(ncin_tmean,"t2m")-273.15  ##deg C
-
-nc_prec="e8b00a84e80f54dee64478c73a68460f.nc"
-ncin_prec=nc_open(paste(root,nc_prec,sep="/"))
-prec=ncvar_get(ncin_prec,"tp")*1000.0  ##mm
-
-nc_tmin="bf9e0bc421ab3b22a93b8c12f935ad00.nc"
-ncin_tmin=nc_open(paste(root,nc_tmin,sep="/"))
-tmin=ncvar_get(ncin_tmin,"mn2t")-273.15  ##deg C
-
-nc_tmax="32cac2ab97baf1b20ef0d18400791f5b.nc"
-ncin_tmax=nc_open(paste(root,nc_tmax,sep="/"))
-tmax=ncvar_get(ncin_tmax,"mx2t")-273.15  ##deg C
-
-nc_globrad="1be3f068ab64a37fa9c34af8e579db7f.nc"
-ncin_globrad=nc_open(paste(root,nc_globrad,sep="/"))
-globrad=ncvar_get(ncin_globrad,"ssrd")/1000000  ##MJ/m2
-
-nc_tdew="e367b813c96edb1ece1edd604ded4a9b.nc"
-ncin_tdew=nc_open(paste(root,nc_tdew,sep="/"))
-tdew=ncvar_get(ncin_tdew,"d2m")-273.15  ##deg C
-
-##computation of vapour pressure based on
-##Murray (1967) On the computation of saturation vapor pressure
-vappres=ifelse(tdew>0,
-               0.61078*exp(17.26937*(tdew)/(tdew+237.3)),
-               0.61078*exp(21.87459*(tdew)/(tdew+265.5)))
-
-
-nc_u10="30bd1acc0326c699895e41075817c26b.nc"
-ncin_u10=nc_open(paste(root,nc_u10,sep="/"))
-wind_u=ncvar_get(ncin_u10,"u10")
-
-nc_v10="c69438e63f848c36a2f7f1f95ade643a.nc"
-ncin_v10=nc_open(paste(root,nc_v10,sep="/"))
-wind_v=ncvar_get(ncin_v10,"v10")
-windspeed=(wind_u^2+wind_u^2)^0.5
-
-meteo_hourly_2020=data.table(dates=dates,
-                             tmean=tmean,
-                             prec=prec,
-                             tmin=tmin,
-                             tmax=tmax,
-                             globrad=globrad,
-                             vappres=vappres,
-                             windspeed=windspeed)
-
-head(meteo_hourly_2020)
-summary(meteo_hourly_2020)
-
-meteo_hourly_2020$date=as.Date(format(meteo_hourly_2020$dates,format="%Y-%m-%d",tz=timezone))
-
-
-
-##2021
-timezone="UTC"#Etc/GMT-1"
-dates=seq(as.POSIXct("2021-01-01 01:00:00"),as.POSIXct("2021-12-31 23:00:00"),by="hour",tz=timezone)
-
-
-nc_tmean="97fe8a62612f15cf7d703b018b7eb974.nc"
-ncin_tmean=nc_open(paste(root,nc_tmean,sep="/"))
-tmean=ncvar_get(ncin_tmean,"t2m")-273.15  ##deg C
-
-nc_prec="3a97642d3052fab5e0c3979a00239016.nc"
-ncin_prec=nc_open(paste(root,nc_prec,sep="/"))
-prec=ncvar_get(ncin_prec,"tp")*1000.0  ##mm
-
-nc_tmin="9d6dd24cc35c8f5429235925bee90bd4.nc"
-ncin_tmin=nc_open(paste(root,nc_tmin,sep="/"))
-tmin=ncvar_get(ncin_tmin,"mn2t")-273.15  ##deg C
-
-nc_tmax="5400dce1c89ab1187d88e67218a94816.nc"
-ncin_tmax=nc_open(paste(root,nc_tmax,sep="/"))
-tmax=ncvar_get(ncin_tmax,"mx2t")-273.15  ##deg C
-
-nc_globrad="cd68862d777b40a89cf56f42a50fff1f.nc"
-ncin_globrad=nc_open(paste(root,nc_globrad,sep="/"))
-globrad=ncvar_get(ncin_globrad,"ssrd")/1000000  ##MJ/m2
-
-nc_tdew="91d79646a7aa2a498754a840bb3c0e8d.nc"
-ncin_tdew=nc_open(paste(root,nc_tdew,sep="/"))
-tdew=ncvar_get(ncin_tdew,"d2m")-273.15  ##deg C
-
-##computation of vapour pressure based on
-##Murray (1967) On the computation of saturation vapor pressure
-vappres=ifelse(tdew>0,
-               0.61078*exp(17.26937*(tdew)/(tdew+237.3)),
-               0.61078*exp(21.87459*(tdew)/(tdew+265.5)))
-
-
-nc_u10="f3f385577b7a08d71b441bab68a8a472.nc"
-ncin_u10=nc_open(paste(root,nc_u10,sep="/"))
-wind_u=ncvar_get(ncin_u10,"u10")
-
-nc_v10="75250a1bfb20a7ec5dfba2dca759f385.nc"
-ncin_v10=nc_open(paste(root,nc_v10,sep="/"))
-wind_v=ncvar_get(ncin_v10,"v10")
-windspeed=(wind_u^2+wind_u^2)^0.5
-
-meteo_hourly_2021=data.table(dates=dates,
-                             tmean=tmean,
-                             prec=prec,
-                             tmin=tmin,
-                             tmax=tmax,
-                             globrad=globrad,
-                             vappres=vappres,
-                             windspeed=windspeed)
-
-head(meteo_hourly_2021)
-summary(meteo_hourly_2021)
-
-meteo_hourly_2021$date=as.Date(format(meteo_hourly_2021$dates,format="%Y-%m-%d",tz=timezone))
-
-
-
-
-##2022
-timezone="UTC"#Etc/GMT-1"
-dates=seq(as.POSIXct("2022-01-01 01:00:00"),as.POSIXct("2022-12-31 23:00:00"),by="hour",tz=timezone)
-
-
-nc_tmean="69d2f5c763c23ff14830e7543e7950ee.nc"
-ncin_tmean=nc_open(paste(root,nc_tmean,sep="/"))
-tmean=ncvar_get(ncin_tmean,"t2m")-273.15  ##deg C
-
-nc_prec="c76f452f8466309e15e2d7ba0208f64.nc"
-ncin_prec=nc_open(paste(root,nc_prec,sep="/"))
-prec=ncvar_get(ncin_prec,"tp")*1000.0  ##mm
-
-nc_tmin="28fb64d8cf86e2e79bd7243989fe8c55.nc"
-ncin_tmin=nc_open(paste(root,nc_tmin,sep="/"))
-tmin=ncvar_get(ncin_tmin,"mn2t")-273.15  ##deg C
-
-nc_tmax="4846fc18637dc571a8faeb375674454a.nc"
-ncin_tmax=nc_open(paste(root,nc_tmax,sep="/"))
-tmax=ncvar_get(ncin_tmax,"mx2t")-273.15  ##deg C
-
-nc_globrad="c5d9661acbd74140367426e1d6ad80dc.nc"
-ncin_globrad=nc_open(paste(root,nc_globrad,sep="/"))
-globrad=ncvar_get(ncin_globrad,"ssrd")/1000000  ##MJ/m2
-
-nc_tdew="d013b6434e81ee0ee741399689d89d70.nc"
-ncin_tdew=nc_open(paste(root,nc_tdew,sep="/"))
-tdew=ncvar_get(ncin_tdew,"d2m")-273.15  ##deg C
-
-##computation of vapour pressure based on
-##Murray (1967) On the computation of saturation vapor pressure
-vappres=ifelse(tdew>0,
-               0.61078*exp(17.26937*(tdew)/(tdew+237.3)),
-               0.61078*exp(21.87459*(tdew)/(tdew+265.5)))
-
-
-nc_u10="3fe0e531f1e20c1d38e44fd7b025f7d0.nc"
-ncin_u10=nc_open(paste(root,nc_u10,sep="/"))
-wind_u=ncvar_get(ncin_u10,"u10")
-
-nc_v10="ce67112248e339ff899d3775277c8129.nc"
-ncin_v10=nc_open(paste(root,nc_v10,sep="/"))
-wind_v=ncvar_get(ncin_v10,"v10")
-windspeed=(wind_u^2+wind_u^2)^0.5
-
-meteo_hourly_2022=data.table(dates=dates,
-                             tmean=tmean,
-                             prec=prec,
-                             tmin=tmin,
-                             tmax=tmax,
-                             globrad=globrad,
-                             vappres=vappres,
-                             windspeed=windspeed)
-
-head(meteo_hourly_2022)
-summary(meteo_hourly_2022)
-
-meteo_hourly_2022$date=as.Date(format(meteo_hourly_2022$dates,format="%Y-%m-%d",tz=timezone))
-
-
-
-##2023
-timezone="UTC"#Etc/GMT-1"
-dates=seq(as.POSIXct("2023-01-01 01:00:00"),as.POSIXct("2023-12-31 23:00:00"),by="hour",tz=timezone)
-
-
-nc_tmean="33622d4d78bd80619b00afe096682335.nc"
-ncin_tmean=nc_open(paste(root,nc_tmean,sep="/"))
-tmean=ncvar_get(ncin_tmean,"t2m")-273.15  ##deg C
-
-nc_prec="f004411e7d489ef8ddf69e73c966cd04.nc"
-ncin_prec=nc_open(paste(root,nc_prec,sep="/"))
-prec=ncvar_get(ncin_prec,"tp")*1000.0  ##mm
-
-nc_tmin="ccb7523d3d89749fd20f6582548e8ede.nc"
-ncin_tmin=nc_open(paste(root,nc_tmin,sep="/"))
-tmin=ncvar_get(ncin_tmin,"mn2t")-273.15  ##deg C
-
-nc_tmax="603b5ce7653da9880974c8bbbeaf24b1.nc"
-ncin_tmax=nc_open(paste(root,nc_tmax,sep="/"))
-tmax=ncvar_get(ncin_tmax,"mx2t")-273.15  ##deg C
-
-nc_globrad="2cfb14b4c96ab97b7ada485a3e199c86.nc"
-ncin_globrad=nc_open(paste(root,nc_globrad,sep="/"))
-globrad=ncvar_get(ncin_globrad,"ssrd")/1000000  ##MJ/m2
-
-nc_tdew="23f040a30e73c651b6846e4a5e94b466.nc"
-ncin_tdew=nc_open(paste(root,nc_tdew,sep="/"))
-tdew=ncvar_get(ncin_tdew,"d2m")-273.15  ##deg C
-
-##computation of vapour pressure based on
-##Murray (1967) On the computation of saturation vapor pressure
-vappres=ifelse(tdew>0,
-               0.61078*exp(17.26937*(tdew)/(tdew+237.3)),
-               0.61078*exp(21.87459*(tdew)/(tdew+265.5)))
-
-
-nc_u10="cf1165fdfe899bc8e9a0ef2270b3841b.nc"
-ncin_u10=nc_open(paste(root,nc_u10,sep="/"))
-wind_u=ncvar_get(ncin_u10,"u10")
-
-nc_v10="911638cb53dfbcbf39711254ab78003.nc"
-ncin_v10=nc_open(paste(root,nc_v10,sep="/"))
-wind_v=ncvar_get(ncin_v10,"v10")
-windspeed=(wind_u^2+wind_u^2)^0.5
-
-meteo_hourly_2023=data.table(dates=dates,
-                             tmean=tmean,
-                             prec=prec,
-                             tmin=tmin,
-                             tmax=tmax,
-                             globrad=globrad,
-                             vappres=vappres,
-                             windspeed=windspeed)
-
-head(meteo_hourly_2023)
-summary(meteo_hourly_2023)
-
-meteo_hourly_2023$date=as.Date(format(meteo_hourly_2023$dates,format="%Y-%m-%d",tz=timezone))
-
-
-
-
-##2024
-timezone="UTC"#Etc/GMT-1"
-dates=seq(as.POSIXct("2024-01-01 01:00:00"),as.POSIXct("2024-12-31 23:00:00"),by="hour",tz=timezone)
-
-
-nc_tmean="1a1dcbf889a1c114c2d4a84fa72f1f89.nc"
-ncin_tmean=nc_open(paste(root,nc_tmean,sep="/"))
-tmean=ncvar_get(ncin_tmean,"t2m")-273.15  ##deg C
-
-nc_prec="ee2e494e4e0663245c38a68de3843827.nc"
-ncin_prec=nc_open(paste(root,nc_prec,sep="/"))
-prec=ncvar_get(ncin_prec,"tp")*1000.0  ##mm
-
-nc_tmin="a646567e3cf57f3496b1bce6e4c0d1f7.nc"
-ncin_tmin=nc_open(paste(root,nc_tmin,sep="/"))
-tmin=ncvar_get(ncin_tmin,"mn2t")-273.15  ##deg C
-
-nc_tmax="6bcc3dc030c13a06b1116a91df1e3dae.nc"
-ncin_tmax=nc_open(paste(root,nc_tmax,sep="/"))
-tmax=ncvar_get(ncin_tmax,"mx2t")-273.15  ##deg C
-
-nc_globrad="f464968306b1ed3d95c43235ed3cf42.nc"
-ncin_globrad=nc_open(paste(root,nc_globrad,sep="/"))
-globrad=ncvar_get(ncin_globrad,"ssrd")/1000000  ##MJ/m2
-
-nc_tdew="3c58ca7b56ac22052ba8fef8893b8f1.nc"
-ncin_tdew=nc_open(paste(root,nc_tdew,sep="/"))
-tdew=ncvar_get(ncin_tdew,"d2m")-273.15  ##deg C
-
-##computation of vapour pressure based on
-##Murray (1967) On the computation of saturation vapor pressure
-vappres=ifelse(tdew>0,
-               0.61078*exp(17.26937*(tdew)/(tdew+237.3)),
-               0.61078*exp(21.87459*(tdew)/(tdew+265.5)))
-
-
-nc_u10="5f1b6be5401592bc0e100e9d83e9b3ba.nc"
-ncin_u10=nc_open(paste(root,nc_u10,sep="/"))
-wind_u=ncvar_get(ncin_u10,"u10")
-
-nc_v10="17f472f1599f3e4b3b5095b39ba0964b.nc"
-ncin_v10=nc_open(paste(root,nc_v10,sep="/"))
-wind_v=ncvar_get(ncin_v10,"v10")
-windspeed=(wind_u^2+wind_u^2)^0.5
-
-meteo_hourly_2024=data.table(dates=dates,
-                             tmean=tmean,
-                             prec=prec,
-                             tmin=tmin,
-                             tmax=tmax,
-                             globrad=globrad,
-                             vappres=vappres,
-                             windspeed=windspeed)
-
-head(meteo_hourly_2024)
-summary(meteo_hourly_2024)
-
-meteo_hourly_2024$date=as.Date(format(meteo_hourly_2024$dates,format="%Y-%m-%d",tz=timezone))
+nc_files=list.files(path=root,pattern=".nc$")
+years=sort(as.numeric(unique(substr(nc_files,start=1,stop=4))))
+variables=unique(substr(nc_files,start=6,stop=(nchar(nc_files)-3)))
+
+##bind time series
+tmean_ts=data.frame()
+prec_ts=data.frame()
+tmin_ts=data.frame()
+tmax_ts=data.frame()
+globrad_ts=data.frame()
+vappres_ts=data.frame()
+windspeed_ts=data.frame()
+
+#year=2019
+for (year in years){
+  print(year)
+  
+  ##air temperature
+  nc_tmean=sprintf("%0.0f_2m_temperature.nc",year)
+  ncin_tmean=nc_open(paste(root,nc_tmean,sep="/"))
+  tmean=ncvar_get(ncin_tmean,"t2m")-273.15  ##deg C
+  tmean_ts=rbind(tmean_ts,data.frame(tmean=tmean))
+  
+  ##precipitation
+  nc_prec=sprintf("%0.0f_total_precipitation.nc",year)
+  ncin_prec=nc_open(paste(root,nc_prec,sep="/"))
+  prec=ncvar_get(ncin_prec,"tp")*1000.0  ##mm
+  prec_ts=rbind(prec_ts,data.frame(prec=prec))
+  
+  ##minimum temperature
+  nc_tmin=sprintf("%0.0f_minimum_2m_temperature_since_previous_post_processing.nc",year)
+  ncin_tmin=nc_open(paste(root,nc_tmin,sep="/"))
+  tmin=ncvar_get(ncin_tmin,"mn2t")-273.15  ##deg C
+  tmin_ts=rbind(tmin_ts,data.frame(tmin=tmin))
+  
+  ##maximum temperature
+  nc_tmax=sprintf("%0.0f_maximum_2m_temperature_since_previous_post_processing.nc",year)
+  ncin_tmax=nc_open(paste(root,nc_tmax,sep="/"))
+  tmax=ncvar_get(ncin_tmax,"mx2t")-273.15  ##deg C
+  tmax_ts=rbind(tmax_ts,data.frame(tmax=tmax))
+  
+  ##global radiation
+  nc_globrad=sprintf("%0.0f_surface_solar_radiation_downwards.nc",year)
+  ncin_globrad=nc_open(paste(root,nc_globrad,sep="/"))
+  globrad=ncvar_get(ncin_globrad,"ssrd")/1000000  ##MJ/m2
+  globrad_ts=rbind(globrad_ts,data.frame(globrad=globrad))
+  
+  ##vapour pressure
+  nc_tdew=sprintf("%0.0f_2m_dewpoint_temperature.nc",year)
+  ncin_tdew=nc_open(paste(root,nc_tdew,sep="/"))
+  tdew=ncvar_get(ncin_tdew,"d2m")-273.15  ##deg C
+  
+  ##computation of vapour pressure based on
+  ##Murray (1967) On the computation of saturation vapor pressure
+  vappres=ifelse(tdew>0,
+                 0.61078*exp(17.26937*(tdew)/(tdew+237.3)),
+                 0.61078*exp(21.87459*(tdew)/(tdew+265.5)))
+  vappres_ts=rbind(vappres_ts,data.frame(vappres=vappres))
+  
+  ##wind speed
+  nc_u10=sprintf("%0.0f_10m_u_component_of_wind.nc",year)
+  ncin_u10=nc_open(paste(root,nc_u10,sep="/"))
+  wind_u=ncvar_get(ncin_u10,"u10")
+  
+  nc_v10=sprintf("%0.0f_10m_v_component_of_wind.nc",year)
+  ncin_v10=nc_open(paste(root,nc_v10,sep="/"))
+  wind_v=ncvar_get(ncin_v10,"v10")
+  windspeed=(wind_u^2+wind_u^2)^0.5
+  windspeed_ts=rbind(windspeed_ts,data.frame(windspeed=windspeed))
+
+}
+
+##create hourly meteo dataset
+start_date=sprintf("%0.0f-01-01 01:00:00",min(years,na.rm=T))
+end_date=sprintf("%0.0f-12-31 23:00:00",max(years,na.rm=T))
+
+dates=seq.POSIXt(from=as.POSIXct(start_date,format="%Y-%m-%d %H:%M:%S",tz=timezone),to=as.POSIXct(end_date,format="%Y-%m-%d %H:%M:%S",tz=timezone),by="hour")
+
+meteo_hourly=data.table(dates,
+                        tmean_ts,
+                        prec_ts,
+                        tmin_ts,
+                        tmax_ts,
+                        globrad_ts,
+                        vappres_ts,
+                        windspeed_ts)
 
 
 ```
 
 
-
 ***
-### Bind data
+### Aggregate to daily data
 
-```{r bind,echo=F,warning=F,error=F}
-
-##hourly data
-meteo_hourly=rbind(meteo_hourly_2019,
-                   meteo_hourly_2020,
-                   meteo_hourly_2021,
-                   meteo_hourly_2022,
-                   meteo_hourly_2023,
-                   meteo_hourly_2024)
-
+```{r aggregate,echo=F,warning=F,error=F}
 
 ##aggregate to daily data
+meteo_hourly$date=as.Date(format(meteo_hourly$dates,format="%Y-%m-%d",tz=timezone))
 meteo_daily=data.table(dates=as.Date(unique(meteo_hourly$date)),
                        tmean=aggregate(meteo_hourly$tmean,by=list(meteo_hourly$date),FUN="mean")[,2],
                        prec=aggregate(meteo_hourly$prec,by=list(meteo_hourly$date),FUN="sum")[,2],
@@ -451,7 +166,7 @@ meteo_daily=data.table(dates=as.Date(unique(meteo_hourly$date)),
                        vappres=aggregate(meteo_hourly$vappres,by=list(meteo_hourly$date),FUN="mean")[,2],
                        windspeed=aggregate(meteo_hourly$windspeed,by=list(meteo_hourly$date),FUN="mean")[,2])
 
-meteo_daily$dates=seq(as.Date("2019-01-01"),as.Date("2024-12-31"),by="day")
+meteo_daily$dates=seq(as.Date(sprintf("%0.0f-01-01 01:00:00",min(years))),as.Date(sprintf("%0.0f-12-31 23:00:00",max(years))),by="day")
 summary(meteo_daily)
 
 
@@ -465,16 +180,9 @@ plot(meteo_daily$dates,meteo_daily$windspeed)
 
 
 ##save meteo data
-write.table(meteo_hourly,paste(root,"ERA5_meteo_hourly.csv",sep="/"),sep=";",row.names=F,quote=F)
+#write.table(meteo_hourly,paste(root,"ERA5_meteo_hourly.csv",sep="/"),sep=";",row.names=F,quote=F)
 write.table(meteo_daily,paste(root,"ERA5_meteo_daily.csv",sep="/"),sep=";",row.names=F,quote=F)
 
 
 ```
-
-
-
-
-
-
-
 

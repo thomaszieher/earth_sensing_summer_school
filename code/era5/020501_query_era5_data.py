@@ -32,10 +32,10 @@ variables=["10m_u_component_of_wind","10m_v_component_of_wind","2m_temperature",
            "total_precipitation","maximum_2m_temperature_since_previous_post_processing",
            "minimum_2m_temperature_since_previous_post_processing","surface_solar_radiation_downwards"]
 
-log=open("log.txt","w")
+#log=open("log.txt","w")
 for year in years:
     for variable in variables:
-        log.write(f"{year}\t{variable}\n")
+        #log.write(f"{year}\t{variable}\n")
 
         dataset="reanalysis-era5-single-levels"
         request={
@@ -63,11 +63,11 @@ for year in years:
             ],
             "data_format": "netcdf",
             "download_format": "unarchived",
-            "area": [46.29, 12.11, 46.26, 12.14]
+            "area": [46.449, 12.215, 46.450, 12.216]
         }
 
         client=cdsapi.Client()
-        client.retrieve(dataset,request).download()
+        target=f"./data/era5/{year}_{variable}.nc"
+        client.retrieve(dataset,request,target)
 
-
-log.close()
+#log.close()

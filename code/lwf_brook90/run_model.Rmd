@@ -1,0 +1,411 @@
+---
+title: "Remote LWF-Brook90 run"
+author: "Thomas Zieher"
+date: "2025-06-04"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r header,include=T}
+#####################################################
+##                                                 ##
+##      ######      #########  ##          ##      ##
+##      #######     ########   ##          ##      ##
+##      ##    ##    ##         ##          ##      ##
+##      ##   ##     ##         ##          ##      ##
+##      ######      ######     ##          ##      ##
+##      #######     #####      ##          ##      ##
+##      ##    ##    ##         ##    ##    ##      ##
+##      ##     ##   ##         ##   ####   ##      ##
+##      ##     ##   ##         ##  ##  ##  ##      ##
+##      ########    ##          ####    ####       ##
+##      #######     ##           ##      ##        ##
+##                                                 ##
+#####################################################
+##                                                 ##
+##  Author: Thomas Zieher                          ##
+##  Institute: Nat Haz, 6.3                        ##
+##  Date: 2025-05-28                               ##
+##  License: GNU GPL V.3 or later                  ##
+##                                                 ##
+#####################################################
+##  Description: Run LWF-Brook90 at San Vito di Cadore
+##  Environment: renv
+#####################################################
+
+##set include=F to omit header in output
+##code partly taken and modified after Schmidt-Walter et al. (2020), Supplement
+
+```
+
+
+```{r setup,include=FALSE}
+knitr::opts_chunk$set(echo=T)
+
+
+library(LWFBrook90R)
+library(data.table)
+library(xts)
+library(dygraphs)
+library(ggplot2)
+
+
+##read ERA5 meteo data
+setwd("../../")
+root=getwd()
+model_path=paste(root,"data/lwf_brook90",sep="/")
+meteo_path=paste(root,"data/era5",sep="/")
+meteo_daily=data.table(read.table(paste(meteo_path,"ERA5_meteo_daily.csv",sep="/"),header=T,sep=";",stringsAsFactors=F))
+meteo_daily$dates=as.Date(meteo_daily$dates)
+
+
+
+```
+
+
+***
+### Parameterization
+General options
+
+```{r options,echo=T,message=F,warning=F,error=F}
+
+##model options
+start_date="2019-01-01"
+end_date="2024-12-31"
+options_forest=set_optionsLWFB90(startdate=as.Date(start_date),
+                                 enddate=as.Date(end_date),
+                                 budburst_method="Menzel",
+                                 leaffall_method="vonWilpert",
+                                 root_method="betamodel",
+                                 lai_method="b90")
+
+```
+
+
+Soil profile
+
+```{r soil,echo=T,message=F,warning=F,error=F}
+
+##generic soil parameterization
+nlayers=6
+max_depth=-0.5#-0.2##-1##
+soil_raw=data.table()
+soil_raw$lower=max_depth
+soil_loc=soil_raw[rep(seq(1,nrow(soil_raw)),nlayers)]
+soil_loc$hor_num=1:nlayers
+soil_loc$gravel=0.8
+soil_loc$corg=2
+soil_loc$topsoil=rep(c(1,0),each=(nlayers/2))
+soil_loc$bd=1.0##1.5##2.0##
+soil_loc$upper=seq(0,(max_depth-(soil_raw$lower/nlayers)),length.out=nlayers)
+soil_loc$lower=seq((soil_raw$lower/nlayers),max_depth,length.out=nlayers)
+soil_loc$dw=15
+
+soil_loc$clay=30
+soil_loc$silt=50
+soil_loc$sand=20
+
+soil_loc=data.table(cbind(soil_loc,hydpar_hypres(clay=soil_loc$clay,
+                                                 silt=soil_loc$silt,
+                                                 bd=soil_loc$bd,
+                                                 oc.pct=soil_loc$corg,
+                                                 topsoil=soil_loc$topsoil)))
+
+soil=soil_loc
+
+```
+
+
+Vegetation parameters
+
+```{r vegetation,echo=T,message=F,warning=F,error=F}
+
+##load parameterizations for European beech and Norway spruce from other project
+load(paste(model_path,"veg_param.rda",sep="/"))
+
+# params_beech$snowlqini=0
+# params_beech$snowccini=0
+# params_spruce$water_table_depth=-9999
+# params_beech$water_table_depth=-9999
+# save(params_spruce,params_beech,file="C:/Users/thomas.zieher/Documents/REPOS/earth_sensing_summer_school/data/lwf_brook90/veg_param.rda")
+
+
+# ##individual vegetation parameterization
+# ##taken from Schmidt-Walter et al. (2020), Supplement
+# params_spruce=set_paramLWFB90(budburst_species="Picea abies (frueh)",
+#                               maxlai=6,
+#                               winlaifrac=0.8,
+#                               height=25,
+#                               sai=0.035*25,
+#                               glmax=0.0053,
+#                               radex=0.5,
+#                               alb=0.14,
+#                               albsn=0.14,
+#                               maxrlen=3100,
+#                               betaroot=0.976,
+#                               maxrootdepth=-1.2,
+#                               lwidth=0.004,
+#                               frintlai=0.12,
+#                               frintsai=0.14,
+#                               cintrl=0.2,
+#                               cintrs=0.4
+#                               )
+# 
+# params_beech=set_paramLWFB90(budburst_species="Fagus sylvatica",
+#                              maxlai=6,
+#                              winlaifrac=0,
+#                              height=25,
+#                              sai=0.035*25,
+#                              glmax=0.0053,
+#                              radex=0.6,
+#                              alb=0.18,
+#                              albsn=0.23,
+#                              maxrlen=3500,
+#                              betaroot=0.966,
+#                              maxrootdepth=-1.4,
+#                              lwidth=0.05,
+#                              frintlai=0.12,
+#                              frintsai=0.25,
+#                              cintrl=0.2,
+#                              cintrs=0.4
+#                              )
+
+```
+
+
+Site specifics
+
+```{r site,echo=T,warning=F,error=F}
+
+coords_x=12.215
+coords_y=46.449
+aspect=290 #east-north-east
+slope=25 #deg
+rooting_depth=-0.5 #m
+drain=1 ##Switch for lower boundary condition to be free drainage (1) or no flow (0)
+ilayer=4 ##Number of layers from top to which infiltration is distributed
+infexp=0.6 ##Shape parameter for distribution of infiltration, for value 0 infiltration is in top layer only.
+
+##set location's coordinates
+params_spruce$coords_x=coords_x
+params_spruce$coords_y=coords_y
+params_beech$coords_x=coords_x
+params_beech$coords_y=coords_y
+
+##set location's aspect and slope angle
+params_spruce$aspect=aspect
+params_spruce$dslope=slope
+params_spruce$eslope=slope
+params_beech$aspect=aspect
+params_beech$dslope=slope
+params_beech$eslope=slope
+  
+##set location's rooting depth
+params_spruce$maxrootdepth=rooting_depth
+params_beech$maxrootdepth=rooting_depth
+
+##set location's drainage parameter
+params_spruce$drain=drain
+params_beech$drain=drain
+
+##set location's ilayer parameter
+params_spruce$ilayer=ilayer
+params_beech$ilayer=ilayer
+
+##set location's infexp parameter
+params_spruce$infexp=infexp
+params_beech$infexp=infexp
+
+
+```
+
+
+
+***
+### Run model
+
+```{r model,echo=F,warning=F,error=F}
+
+res_spruce=run_LWFB90(options_b90=options_forest,
+                      param_b90=params_spruce,
+                      climate=meteo_daily,
+                      soil=soil
+                      )
+
+res_beech=run_LWFB90(options_b90=options_forest,
+                     param_b90=params_beech,
+                     climate=meteo_daily,
+                     soil=soil
+                     )
+
+```
+
+
+***
+### Plots
+Daily water balance components
+
+```{r wb_daily,echo=F,message=F,warning=F,error=F}
+
+##bind evap-fluxes from result lists
+wb_spruce=rbindlist(list(`Spruce`=res_spruce$output),
+                         idcol="vegetation")
+
+wb_beech=rbindlist(list(`Beech`=res_beech$output),
+                        idcol="vegetation")
+
+##add date
+wb_spruce$date=as.Date(sprintf("%i-%0.2i-%0.2i",wb_spruce$yr,wb_spruce$mo,wb_spruce$da),format="%Y-%m-%d")
+wb_beech$date=as.Date(sprintf("%i-%0.2i-%0.2i",wb_beech$yr,wb_beech$mo,wb_beech$da),format="%Y-%m-%d")
+
+##add surface runoff
+wb_spruce[,surfrunoff := flow-vrfln]
+wb_beech[,surfrunoff := flow-vrfln]
+
+##bind results
+wb=rbind(wb_spruce,wb_beech)
+
+##rfal and smlt from model results
+tmin=xts(meteo_daily$tmin,order.by=meteo_daily$dates)
+tmax=xts(meteo_daily$tmax,order.by=meteo_daily$dates)
+tmean=xts(meteo_daily$tmean,order.by=meteo_daily$dates)
+
+nprec=xts(wb_beech$rfal,order.by=wb_beech$date)
+sfal=xts(wb_beech$sfal,order.by=wb_beech$date)
+smlt=xts(-wb_beech$smlt,order.by=wb_beech$date)
+srf=xts(-wb_beech$surfrunoff,order.by=wb_beech$date)
+
+tseries_plot=merge(tmin,tmax,tmean,nprec,sfal,smlt,srf)
+
+##fill missing 15min measurements with closest measurement
+#tseries_smc_filled=na.locf(tseries_plot,fromLast=F,maxgap=10)
+
+##plot wb
+cols_prec=c("#0800ff","#50aaff","#50ffff","#F39200","#ebeb34","#F39200","#FF1000")
+par(mar=c(5,5,5,5))
+dygraph(tseries_plot,width=600,height=400) %>%
+  dyAxis("y",label="Water balance elements [mm]",valueRange=c(-20,60)) %>%
+  dyAxis("y2",label="Temperature [deg C]",valueRange=c(-10,30)) %>%
+  dyBarSeries('nprec',label="Rainfall [mm/d]",axis="y") %>% 
+  dyBarSeries('sfal',label="Snow fall [mm/d]",axis="y") %>% 
+  dyBarSeries('smlt',label="Snow melt [mm/d]",axis="y") %>% 
+  dyBarSeries('srf',label="Surface runoff [mm/d]",axis="y") %>% 
+  dyOptions(stackedGraph=T) %>%
+  dySeries('tmin',label="Tmin [deg C]",axis="y2") %>% 
+  dySeries('tmean',label="Tmean [deg C]",axis="y2") %>% 
+  dySeries('tmax',label="Tmax [deg C]",axis="y2") %>% 
+  dyOptions(stackedGraph=F,colors=cols_prec) %>%
+  dyRangeSelector(height=20) %>%
+  dyLegend(show="always",width=120)
+
+
+```
+
+
+```{r swati,echo=F,warning=F,error=F}
+
+##bind evap-fluxes from result lists
+swat_spruce=rbindlist(list(`Spruce`=res_spruce$layer_output),
+                      idcol="vegetation")
+
+swat_beech=rbindlist(list(`Beech`=res_beech$layer_output),
+                     idcol="vegetation")
+
+```
+
+
+
+Water balance: Mean monthly conditions
+
+```{r annual,echo=F,message=F,warning=F,error=F}
+
+##compute monthly sums and means
+##"tdiff","evap","tran", "ievp", "gevp","surfrunoff","vrfln", "flow"
+mean_list=c("snow","swat","gwat","seep","gwfl","srfl","slfl","byfl","dsfl",
+                  "stres","adef","awat","relawat","nits","balerr","slrad","solnet","lngnet","aa","asubs")
+
+sum_list=c("rfal","rint","sfal","sint","rthr","sthr","rsno","rnet",
+           "smlt","intr","ints","evap","tran",
+           "irvp","isvp","slvp","snvp",
+           "pint","ptran","pslvp","safrac",
+           "surfrunoff","flow","vrfln"
+           )
+
+##aggregate values to sum and mean
+agg_sum=aggregate(wb[,..sum_list],by=list(sprintf("%i-%0.2i-01",wb$yr,wb$mo),
+                                               wb$vegetation),FUN="sum")
+agg_sum["date"]=as.Date(agg_sum[,1],format="%Y-%m-%d")
+agg_sum["yr"]=year(agg_sum$date)
+agg_sum["mo"]=month(agg_sum$date)
+agg_sum["vegetation"]=agg_sum[,2]
+agg_sum=agg_sum[!grepl(pattern="Group",names(agg_sum))]
+
+agg_mean=aggregate(wb[,..mean_list],by=list(sprintf("%i-%0.2i-01",wb$yr,wb$mo),
+                                                 wb$vegetation),FUN="mean")
+agg_mean=agg_mean[!grepl(pattern="Group",names(agg_mean))]
+
+##bind monthly aggregated values
+evapmon=data.table(cbind(agg_sum,agg_mean))
+
+##aggregate all variables to monthly values
+evap_m=evapmon[yr %in% year(start_date):year(end_date),lapply(.SD, mean),by=list(vegetation,mo)]
+
+##melt
+hgts=melt(evap_m[,list(vegetation,mo,
+                          evap=evap,
+                          gevp=slvp+snvp,
+                          ievp=irvp+isvp,
+                          tran,
+                          tdiff=ptran-tran,
+                          vrfln=-vrfln,
+                          surfrunoff=-surfrunoff,
+                          flow=-flow)],
+          id.vars=c("vegetation","mo"))
+
+
+hgts$month=factor(month.abb[hgts$mo],levels=month.abb)
+hgts$variable=factor(hgts$variable,levels=c("tdiff","evap","tran", "ievp", "gevp","surfrunoff","vrfln","flow"))
+
+##precipitation
+prec=meteo_daily[year(dates) %in% year(start_date):year(end_date),list(prec=sum(prec)),
+           by=list(year(dates),month(dates))][,lapply(.SD,mean),by=month]
+prec$month=factor(month.abb[prec$month],levels=month.abb)
+
+
+##bar colors
+barcolors=c("#d01c8b","#abdda4","#ffffbf","#fdae61","#91bfdb","#2b83EE","#2b83cf","#2b83ba")
+
+##theme for plotting
+theme_budg=theme(
+  axis.text.x=element_text(angle=90,vjust=0.5),
+  axis.line=element_line(linewidth=0.3),
+  axis.ticks=element_line(linewidth=0.3),
+  legend.position="right",
+  legend.background=element_blank(),
+  legend.key=element_blank(),
+  panel.background=element_rect(color="black",fill=NA),
+  panel.grid=element_blank(),
+  panel.border=element_rect(colour="black",fill=NA,size=0.3),
+  strip.background.x=element_rect(color="black",fill=NA,size=0.3),
+  axis.text=element_text(size=7),
+  axis.title=element_text(size=10),
+  legend.text=element_text(size=8),
+  legend.key.size=unit(5,"mm"))
+
+p_budg=ggplot(hgts[!variable %in% c("evap","flow"),]) +
+  geom_bar(aes(x=month,y=value,fill=variable),
+           stat='identity',position='stack',color="black",linewidth=0.05) +
+  geom_line(data=prec,
+            aes(x=month,y=prec,group=1,color="P"),linewidth=0.4) +
+  scale_color_manual(values="black",labels="P",name="") +
+  scale_fill_manual(values=barcolors,labels=expression(T[D],T[a],E[i],E[s],R,D)) +
+  facet_grid(~ vegetation) +
+  labs(x ="Month",y="Water flux [mm]",fill="",title=NULL) +
+  scale_y_continuous(sec.axis=sec_axis(transform=~.*1),breaks=seq(-100,200,50))+
+  theme_budg
+print(p_budg)
+
+```
+
+

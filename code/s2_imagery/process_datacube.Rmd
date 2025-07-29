@@ -146,14 +146,14 @@ s2_coll=gdalcubes::create_image_collection(files$filepath,"Sentinel2_L2A")
 ####COMPUTE MEDIAN INDICES
 ##set detailed area with higher resolution
 v_subarea=gdalcubes::cube_view(#extent=list(left=660000,right=690000,bottom=5200000,top=5260000,
-  # t0="2023-01-01",t1="2023-12-31"),
-  # extent=list(left=538000,right=810000,bottom=5170000,top=5295000,
+  #t0="2023-01-01",t1="2023-12-31"),
+  #extent=list(left=538000,right=810000,bottom=5170000,top=5295000,
   #t0="2023-04-01",t1="2023-09-30"),
   #t0="2018-01-01",t1="2021-12-31"),
   #t0="2018-01-01",t1="2018-12-31"),
   #t0="2019-01-01",t1="2019-12-31"),
   #t0="2020-01-01",t1="2020-12-31"),
-  # t0="2021-01-01",t1="2021-12-31"),
+  #t0="2021-01-01",t1="2021-12-31"),
   #t0="2018-01-01",t1="2023-12-31"),
   extent=list(left=282000,right=289000,bottom=5145000,top=5152000,
               t0="2019-01-01",t1="2024-12-31"),
@@ -545,9 +545,8 @@ ndvi_cube=gdalcubes::raster_cube(s2_coll,v_subarea) |>
   apply_pixel(c("(B08-B04)/(B08+B04)"),names="NDVI")
 
 #gdalcubes::write_tif(ndvi_cube,paste(outpath,"ndvi_cube",sep="/"))
-#gdalcubes::write_ncdf(ndvi_cube,"D:/test.nc",overwrite=T)
-
-
+#gdalcubes::write_ncdf(ndvi_cube,paste(outpath,"ndvi_cube.nc",sep="/"),overwrite=T)
+#gdalcubes::write_ncdf(raster_cube(s2_coll,v_subarea),"D:/s2_coll.nc",overwrite=T)
 
 
 
@@ -568,17 +567,18 @@ ndvi_cube=gdalcubes::raster_cube(s2_coll,v_subarea) |>
 
 
 
+```
 
 
+***
+### Apply to full raster
 
-
-
+```{r raster,echo=F,warning=F,error=F}
 
 ##minimum number of valid non-NA scenes per year for time series
 min_scenes=10
 ##minimum number of points for linear regression
 minreg=5
-
 
 
 ##set time zone
@@ -644,91 +644,89 @@ total=length(coords_x)*length(coords_y)
 # total=length(coords_x)*length(coords_y)
 
 
-i=1
-# xcoord=coords_x[1]
-# ycoord=coords_y[1]
-gdalcubes::gdalcubes_options(parallel=8,show_progress=F)
-var="NDVI"
-quant=0.9
-
-
-files=data.frame(files=list.files(outpath,pattern="ndvi_analyses"))
-files["ycoord"]=substr(files$files,start=15,stop=21)
-coords_y=coords_y[!coords_y%in%files$ycoord]
-
-for (ycoord in coords_y){
-  print(ycoord)
-  collection_ndvi=data.frame()
-  for (xcoord in coords_x){
-    #print(xcoord)
-    if (i%%1000==0) print(sprintf("processing %i: %i, %i",i,xcoord,ycoord))
-    
-    ##get clean time series
-    pt=st_as_sf(data.frame(id="P1",xcoord=xcoord,ycoord=ycoord),coords=c("xcoord","ycoord"),crs="epsg:32633")
-    
-    ##version with terra::extract
-    # start=Sys.time()
-    #ts_single=data.frame(date=dates,NDVI=na.omit(t(terra::extract(ndvi_stack,pt))))
-    #Sys.time()-start
-    
-    # start=Sys.time()
-    ts_single=suppressWarnings(suppressMessages(gdalcubes::extract_geom(ndvi_cube,pt)))
-    ts_single["date"]=as.POSIXct(ts_single$time)
-    # Sys.time()-start
-    
-    ts_single=ts_single[order(ts_single$date),]
-    
-    ##get annual maxima (--> better seasonal?)
-    ts_single["year"]=format(ts_single$date,format="%Y")
-    ann_max=data.frame()
-    #year="2022"
-    for (year in unique(ts_single$year)){
-      ts_single_sub=ts_single[ts_single$year==year,]
-      if (nrow(ts_single_sub)>min_scenes){
-        selection=ts_single_sub[,c(var)]>=quantile(ts_single_sub[,c(var)],quant,na.rm=T)
-        #selection[is.na(ts_single_sub[,c(var)]>=quantile(ts_single_sub[,c(var)],quant,na.rm=T))]=F
-        ann_max=rbind(ann_max,ts_single_sub[selection,])
-      }
-    }
-    
-    #plot(ts_single$date,ts_single[,c(var)],type="l",col="dark green",lwd=2,ylim=c(-1,1))
-    #points(ann_max$date,ann_max[,c(var)],col="red",pch=20)
-    
-    if (nrow(ann_max)>=minreg){
-      ##trend
-      linfit=lm(ann_max[,c(var)]~ann_max$date)
-      #abline(linfit)
-      trend=coefficients(summary(linfit))[2,1]*60*60*24*365 ##1/yr
-      r2=summary(linfit)$r.squared
-      median_value=median(ann_max[,c(var)])
-      mean_value=mean(ann_max[,c(var)])
-      sd_value=sd(ann_max[,c(var)])
-    }else{
-      trend=NA
-      r2=NA
-      median_value=NA
-      mean_value=NA
-      sd_value=NA
-    }
-    
-    collection_ndvi=rbind(collection_ndvi,data.frame(x=xcoord,
-                                                     y=ycoord,
-                                                     trend=trend,
-                                                     r2=r2,
-                                                     median=median_value,
-                                                     mean=mean_value,
-                                                     sd=sd_value))
-    ##count
-    i=i+1
-    
-  }
-  
-  ##write each raster row
-  write.table(collection_ndvi,paste(outpath,sprintf("ndvi_analyses_%i.csv",ycoord),sep="/"),sep=";",quote=F,row.names=F)
-  
-}
-
-
+# i=1
+# # xcoord=coords_x[1]
+# # ycoord=coords_y[1]
+# gdalcubes::gdalcubes_options(parallel=8,show_progress=F)
+# var="NDVI"
+# quant=0.9
+# 
+# 
+# files=data.frame(files=list.files(outpath,pattern="ndvi_analyses"))
+# files["ycoord"]=substr(files$files,start=15,stop=21)
+# coords_y=coords_y[!coords_y%in%files$ycoord]
+# 
+# for (ycoord in coords_y){
+#   print(ycoord)
+#   collection_ndvi=data.frame()
+#   for (xcoord in coords_x){
+#     #print(xcoord)
+#     if (i%%1000==0) print(sprintf("processing %i: %i, %i",i,xcoord,ycoord))
+#     
+#     ##get clean time series
+#     pt=st_as_sf(data.frame(id="P1",xcoord=xcoord,ycoord=ycoord),coords=c("xcoord","ycoord"),crs="epsg:32633")
+#     
+#     ##version with terra::extract
+#     # start=Sys.time()
+#     #ts_single=data.frame(date=dates,NDVI=na.omit(t(terra::extract(ndvi_stack,pt))))
+#     #Sys.time()-start
+#     
+#     # start=Sys.time()
+#     ts_single=suppressWarnings(suppressMessages(gdalcubes::extract_geom(ndvi_cube,pt)))
+#     ts_single["date"]=as.POSIXct(ts_single$time)
+#     # Sys.time()-start
+#     
+#     ts_single=ts_single[order(ts_single$date),]
+#     
+#     ##get annual maxima (--> better seasonal?)
+#     ts_single["year"]=format(ts_single$date,format="%Y")
+#     ann_max=data.frame()
+#     #year="2022"
+#     for (year in unique(ts_single$year)){
+#       ts_single_sub=ts_single[ts_single$year==year,]
+#       if (nrow(ts_single_sub)>min_scenes){
+#         selection=ts_single_sub[,c(var)]>=quantile(ts_single_sub[,c(var)],quant,na.rm=T)
+#         #selection[is.na(ts_single_sub[,c(var)]>=quantile(ts_single_sub[,c(var)],quant,na.rm=T))]=F
+#         ann_max=rbind(ann_max,ts_single_sub[selection,])
+#       }
+#     }
+#     
+#     #plot(ts_single$date,ts_single[,c(var)],type="l",col="dark green",lwd=2,ylim=c(-1,1))
+#     #points(ann_max$date,ann_max[,c(var)],col="red",pch=20)
+#     
+#     if (nrow(ann_max)>=minreg){
+#       ##trend
+#       linfit=lm(ann_max[,c(var)]~ann_max$date)
+#       #abline(linfit)
+#       trend=coefficients(summary(linfit))[2,1]*60*60*24*365 ##1/yr
+#       r2=summary(linfit)$r.squared
+#       median_value=median(ann_max[,c(var)])
+#       mean_value=mean(ann_max[,c(var)])
+#       sd_value=sd(ann_max[,c(var)])
+#     }else{
+#       trend=NA
+#       r2=NA
+#       median_value=NA
+#       mean_value=NA
+#       sd_value=NA
+#     }
+#     
+#     collection_ndvi=rbind(collection_ndvi,data.frame(x=xcoord,
+#                                                      y=ycoord,
+#                                                      trend=trend,
+#                                                      r2=r2,
+#                                                      median=median_value,
+#                                                      mean=mean_value,
+#                                                      sd=sd_value))
+#     ##count
+#     i=i+1
+#     
+#   }
+#   
+#   ##write each raster row
+#   write.table(collection_ndvi,paste(outpath,sprintf("ndvi_analyses_%i.csv",ycoord),sep="/"),sep=";",quote=F,row.names=F)
+#   
+# }
 
 ```
 
@@ -740,11 +738,6 @@ for (ycoord in coords_y){
 ```{r write,echo=F,warning=F,error=F}
 
 
-
-
-
-
-write.table(collection_ndvi,"ndvi_trends.txt",sep=";",quote=F,row.names=F)
 collection_ndvi=read.table("ndvi_trends.txt",sep=";",header=T)
 
 
