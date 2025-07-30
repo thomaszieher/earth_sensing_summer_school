@@ -43,23 +43,79 @@ editor_options:
 ```{r setup,include=FALSE}
 knitr::opts_chunk$set(echo=T)
 
+##empty environment
+rm(list=ls())
+
+##install package renv
+#install.packages("renv")
+
+##install packages with respective version
+#renv::snapshot()
+renv::restore()
+
 
 library(LWFBrook90R)
 library(data.table)
 library(xts)
 library(dygraphs)
 library(ggplot2)
+library(climatol)
+library(rstudioapi)
 
 
-##read ERA5 meteo data
-setwd("../../")
-root=getwd()
+##retrieving script path
+proj_path=dirname(rstudioapi::getActiveProject())
+
+##set paths
+root=paste(proj_path,"earth_sensing_summer_school",sep="/")
 model_path=paste(root,"data/lwf_brook90",sep="/")
 meteo_path=paste(root,"data/era5",sep="/")
+soil_path=paste(root,"data/soilgrids",sep="/")
+
+##set period
+start_date=as.Date("2019-01-01")
+end_date=as.Date("2024-12-31")
+
+```
+
+
+***
+### Read meteo data
+
+```{r meteo,echo=T,message=F,warning=F,error=F}
+
+##read ERA5 meteo data
 meteo_daily=data.table(read.table(paste(meteo_path,"ERA5_meteo_daily.csv",sep="/"),header=T,sep=";",stringsAsFactors=F))
 meteo_daily$dates=as.Date(meteo_daily$dates)
 
+##adjust meteo
+meteo_daily$prec=meteo_daily$prec*0.5
+meteo_daily$tmean=meteo_daily$tmean*1.2
+meteo_daily$tmin=meteo_daily$tmin*1.2
+meteo_daily$tmax=meteo_daily$tmax*1.2
 
+
+##Walther-Lieth diagram
+##aggregate to monthly values
+tmin=setDT(meteo_daily)[year(dates)%in%year(start_date):year(end_date), .(tmin=min(tmin)),by=.(yr=year(dates),mon=month(dates))]
+tmax=setDT(meteo_daily)[year(dates)%in%year(start_date):year(end_date), .(tmax=max(tmax)),by=.(yr=year(dates),mon=month(dates))]
+psum=setDT(meteo_daily)[year(dates)%in%year(start_date):year(end_date), .(psum=sum(prec)),by=.(yr=year(dates),mon=month(dates))]
+
+##aggregate to mean monthly values
+meteo_monthly=aggregate(data.frame(psum=psum$psum,
+                                   tmax=tmax$tmax,
+                                   tmin=tmin$tmin,
+                                   tabsmin=abs(tmin$tmin)),
+                        by=list(tmin$mon),FUN="mean")
+
+diagwl(t(meteo_monthly[,2:5]), est="Location",alt="XXX",mlab="en",cols=NULL)
+
+
+# hist(meteo_daily$prec)
+# plot(meteo_daily$prec,type="h")
+# aggregate(psum$psum,by=list(psum$yr),FUN="sum")
+##too much precipitation, too cold
+##grid point at high elevation??
 
 ```
 
@@ -71,10 +127,8 @@ General options
 ```{r options,echo=T,message=F,warning=F,error=F}
 
 ##model options
-start_date="2019-01-01"
-end_date="2024-12-31"
-options_forest=set_optionsLWFB90(startdate=as.Date(start_date),
-                                 enddate=as.Date(end_date),
+options_forest=set_optionsLWFB90(startdate=start_date,
+                                 enddate=end_date,
                                  budburst_method="Menzel",
                                  leaffall_method="vonWilpert",
                                  root_method="betamodel",
@@ -87,32 +141,47 @@ Soil profile
 
 ```{r soil,echo=T,message=F,warning=F,error=F}
 
-##generic soil parameterization
-nlayers=6
-max_depth=-0.5#-0.2##-1##
-soil_raw=data.table()
-soil_raw$lower=max_depth
-soil_loc=soil_raw[rep(seq(1,nrow(soil_raw)),nlayers)]
-soil_loc$hor_num=1:nlayers
-soil_loc$gravel=0.8
-soil_loc$corg=2
-soil_loc$topsoil=rep(c(1,0),each=(nlayers/2))
-soil_loc$bd=1.0##1.5##2.0##
-soil_loc$upper=seq(0,(max_depth-(soil_raw$lower/nlayers)),length.out=nlayers)
-soil_loc$lower=seq((soil_raw$lower/nlayers),max_depth,length.out=nlayers)
-soil_loc$dw=15
+##import soilgrids database
+soilgrid_profiles=readRDS(paste(soil_path,"soilgrids_profiles.rds",sep="/"))
+sites=aqp::site(soilgrid_profiles)
+profiles=aqp::horizons(soilgrid_profiles)
 
-soil_loc$clay=30
-soil_loc$silt=50
-soil_loc$sand=20
+##get single location
+pid="P1"
+location=sites[sites$id==pid,]
+soil=profiles[profiles$id==pid,]
 
-soil_loc=data.table(cbind(soil_loc,hydpar_hypres(clay=soil_loc$clay,
-                                                 silt=soil_loc$silt,
-                                                 bd=soil_loc$bd,
-                                                 oc.pct=soil_loc$corg,
-                                                 topsoil=soil_loc$topsoil)))
+##modifications for LWF-Brook90
+soil["upper"]=soil$upr/100.0*-1.0
+soil["lower"]=soil$lwr/100.0*-1.0
 
-soil=soil_loc
+
+# ##individual soil parameterization
+# nlayers=6
+# max_depth=-0.5#-0.2##-1##
+# soil_raw=data.table()
+# soil_raw$lower=max_depth
+# soil_loc=soil_raw[rep(seq(1,nrow(soil_raw)),nlayers)]
+# soil_loc$hor_num=1:nlayers
+# soil_loc$gravel=0.8
+# soil_loc$corg=2
+# soil_loc$topsoil=rep(c(1,0),each=(nlayers/2))
+# soil_loc$bd=1.0##1.5##2.0##
+# soil_loc$upper=seq(0,(max_depth-(soil_raw$lower/nlayers)),length.out=nlayers)
+# soil_loc$lower=seq((soil_raw$lower/nlayers),max_depth,length.out=nlayers)
+# soil_loc$dw=15
+# 
+# soil_loc$clay=30
+# soil_loc$silt=50
+# soil_loc$sand=20
+# 
+# soil_loc=data.table(cbind(soil_loc,hydpar_hypres(clay=soil_loc$clay,
+#                                                  silt=soil_loc$silt,
+#                                                  bd=soil_loc$bd,
+#                                                  oc.pct=soil_loc$corg,
+#                                                  topsoil=soil_loc$topsoil)))
+# 
+# soil=soil_loc
 
 ```
 
@@ -123,13 +192,6 @@ Vegetation parameters
 
 ##load parameterizations for European beech and Norway spruce from other project
 load(paste(model_path,"veg_param.rda",sep="/"))
-
-# params_beech$snowlqini=0
-# params_beech$snowccini=0
-# params_spruce$water_table_depth=-9999
-# params_beech$water_table_depth=-9999
-# save(params_spruce,params_beech,file="C:/Users/thomas.zieher/Documents/REPOS/earth_sensing_summer_school/data/lwf_brook90/veg_param.rda")
-
 
 # ##individual vegetation parameterization
 # ##taken from Schmidt-Walter et al. (2020), Supplement

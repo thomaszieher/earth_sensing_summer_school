@@ -1,0 +1,212 @@
+---
+title: "Soil grids preparation"
+author: "Thomas"
+date: "2024-08-14"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r header,include=T}
+#####################################################
+##                                                 ##
+##      ######      #########  ##          ##      ##
+##      #######     ########   ##          ##      ##
+##      ##    ##    ##         ##          ##      ##
+##      ##   ##     ##         ##          ##      ##
+##      ######      ######     ##          ##      ##
+##      #######     #####      ##          ##      ##
+##      ##    ##    ##         ##    ##    ##      ##
+##      ##     ##   ##         ##   ####   ##      ##
+##      ##     ##   ##         ##  ##  ##  ##      ##
+##      ########    ##          ####    ####       ##
+##      #######     ##           ##      ##        ##
+##                                                 ##
+#####################################################
+##                                                 ##
+##  Author: Thomas Zieher                          ##
+##  Institute: Nat Haz, 6.3                        ##
+##  Date: 2024-08-14                               ##
+##  License: GNU GPL V.3 or later                  ##
+##                                                 ##
+#####################################################
+##  Description: script for preparing soil grids V2.0 profiles at mapped locations for LWF-Brook90
+##  Environment: myenv_r
+#####################################################
+
+##set include=F to omit header in output
+
+```
+
+
+```{r setup,include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+##todo: prep dtm, https://idt2.regione.veneto.it/idt/downloader/download
+
+##empty environment
+rm(list=ls())
+
+##install package renv
+#install.packages("renv")
+
+##install packages with respective version
+renv::snapshot()
+renv::restore()
+
+##libraries
+library(aqp)
+library(raster)
+library(sf)
+library(data.table)
+library(LWFBrook90R)
+library(knitr)
+library(rstudioapi)
+
+
+##retrieving script path
+proj_path=dirname(rstudioapi::getActiveProject())
+
+##set root
+root=paste(proj_path,"earth_sensing_summer_school",sep="/")
+soilgrids_path=paste(root,"data/soilgrids",sep="/")
+
+```
+
+
+***
+### Soil grids data
+
+```{r soil_grids,echo=F,message=F,warning=F,error=F}
+
+##load soil grids in stacks
+sandfiles=list.files(soilgrids_path,pattern="sand",full.names=T)
+sandfiles=sandfiles[!grepl(pattern="aux",x=sandfiles)]
+sand=raster::stack(sandfiles)
+siltfiles=list.files(soilgrids_path,pattern="silt",full.names=T)
+siltfiles=siltfiles[!grepl(pattern="aux",x=siltfiles)]
+silt=raster::stack(siltfiles)
+clayfiles=list.files(soilgrids_path,pattern="clay",full.names=T)
+clayfiles=clayfiles[!grepl(pattern="aux",x=clayfiles)]
+clay=raster::stack(clayfiles)
+bdfiles=list.files(soilgrids_path,pattern="bd",full.names=T)
+bdfiles=bdfiles[!grepl(pattern="aux",x=bdfiles)]
+bd=raster::stack(bdfiles)
+gravelfiles=list.files(soilgrids_path,pattern="gravel",full.names=T)
+gravelfiles=gravelfiles[!grepl(pattern="aux",x=gravelfiles)]
+gravel=raster::stack(gravelfiles)
+corgfiles=list.files(soilgrids_path,pattern="corg",full.names=T)
+corgfiles=corgfiles[!grepl(pattern="aux",x=corgfiles)]
+corg=raster::stack(corgfiles)
+
+
+##extract properties from soilgrid stacks at single points
+propext=function(raststack,point){
+  property=raster::extract(raststack,point)
+  
+  ##add prop
+  ##could add check if more properties are in stack -> error
+  prop_name=unique(substr(x=colnames(property),start=0,stop=unlist(gregexpr("_",text=colnames(property)))-1))[1]
+  
+  ##init data frame
+  prop=data.frame(c(property))
+  names(prop)=prop_name
+  
+  ##add depths
+  prop["upr"]=as.numeric(substr(x=colnames(property),
+                                    start=unlist(gregexpr("_",text=colnames(property)))+1,
+                                    stop=unlist(gregexpr("\\.",text=colnames(property)))-1
+                                    )
+                             )
+  prop["lwr"]=as.numeric(substr(x=colnames(property),
+                                  start=unlist(gregexpr("\\.",text=colnames(property)))+1,
+                                  stop=nchar(colnames(property))-2
+                                  )
+                           )
+  prop["mean_depth"]=(prop$upr+prop$lwr)/2.0
+
+  ##order
+  prop=prop[order(prop$upr,decreasing=T),]
+  return(prop)
+}
+
+
+##prepare soil profile sites
+sites=data.frame(id=c("P1"),
+                 lon=c(12.215),
+                 lat=c(46.449),
+                 aspect=c(290),
+                 slop=c(25)
+)
+sites["rowid"]=1:nrow(sites)
+soil_sites=st_as_sf(sites,coords=c("lon","lat"))
+st_crs(soil_sites)=4326
+
+soilgrid_points=propext(sand,soil_sites)[,c("upr","lwr")]
+soilgrid_points["id"]=rep(soil_sites$id,times=length(unique(soilgrid_points$upr)))
+soilgrid_points["sand"]=propext(sand,soil_sites)$sand/10.0
+soilgrid_points["silt"]=propext(silt,soil_sites)$silt/10.0
+soilgrid_points["clay"]=propext(clay,soil_sites)$clay/10.0
+soilgrid_points["gravel"]=propext(gravel,soil_sites)$gravel/1000.0
+soilgrid_points["corg"]=propext(corg,soil_sites)$corg/100.0
+soilgrid_points["bd"]=propext(bd,soil_sites)$bd/100.0
+
+soilgrid_points=soilgrid_points[order(soilgrid_points$upr),]
+soilgrid_points["topsoil"]=rep(c(1,1,0,0,0,0),times=length(unique(soilgrid_points$id)))
+soilgrid_points["horizon_nr"]=rep(1:6,times=length(unique(soilgrid_points$id)))
+
+
+##apply ptf implemented in LWF-Brook90
+soilgrid_database=cbind(soilgrid_points,LWFBrook90R::hydpar_hypres(clay=soilgrid_points$clay,
+                                                                   silt=soilgrid_points$silt,
+                                                                   bd=soilgrid_points$bd,
+                                                                   oc.pct=soilgrid_points$corg,
+                                                                   topsoil=soilgrid_points$topsoil))
+
+
+##save soilgrids database as aqp
+aqp::depths(soilgrid_database)=id~upr+lwr
+
+
+##add site infos
+sites_raw=aqp::site(soilgrid_database)
+sites_merged=merge(sites_raw,sites,by="id")
+
+##spatial points, transform coordinates
+sites_merged_sp=sf::st_as_sf(sites_merged,coords=c("lon","lat"))
+sites_merged_sp=sf::st_set_crs(sites_merged_sp,st_crs("EPSG:4326"))
+sites_merged_sp["lon"]=sf::st_coordinates(sites_merged_sp)[,1]
+sites_merged_sp["lat"]=sf::st_coordinates(sites_merged_sp)[,2]
+
+##sort
+sites_merged_sp=sites_merged_sp[order(sites_merged_sp$rowid),]
+site(soilgrid_database)=sites_merged_sp
+
+##add spatial information
+aqp::coordinates(soilgrid_database)=~lon+lat
+aqp::proj4string(soilgrid_database)=sp::CRS(SRS_string="EPSG:4326")
+
+##add coordinates again (are eaten two lines above)
+aqp::site(soilgrid_database)=sites_merged_sp
+
+
+##plot tables
+knitr::kable(aqp::site(soilgrid_database),digits=2)
+knitr::kable(aqp::horizons(soilgrid_database),digits=2)
+
+
+##profile plots (not working with knitr)
+#aqp::plotSPC(soilgrid_database,color="clay",col.label="Clay content (%)")
+#aqp::plotSPC(soilgrid_database,color="bd",col.label="Soil bulk density [g/cm3]")
+
+
+##plot map
+plot(raster(sandfiles[1])/10.0)
+mtext(side=4,"Sand content [%]")
+points(soil_sites)
+
+saveRDS(soilgrid_database,paste(soilgrids_path,"soilgrids_profiles.rds",sep="/"))
+
+
+```
+

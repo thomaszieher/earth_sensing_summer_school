@@ -30,7 +30,7 @@ editor_options:
 ##  License: GNU GPL V.3 or later                  ##
 ##                                                 ##
 #####################################################
-##  Description: Prepare ERA5 meteo time series for LWF-Brook90
+##  Description: Prepare ERA5 meteo time series for LWF-Brook90, 
 ##  Environment: renv
 #####################################################
 
@@ -42,12 +42,26 @@ editor_options:
 ```{r setup}
 knitr::opts_chunk$set(echo=T)
 
-setwd("../../")
-root=paste(getwd(),"data/era5",sep="/")
+##empty environment
+rm(list=ls())
+
+##install package renv
+#install.packages("renv")
+
+##install packages with respective version
+renv::restore()
 
 library(ncdf4)
 library(data.table)
+library(rstudioapi) 
 
+##retrieving script path
+proj_path=dirname(rstudioapi::getActiveProject())
+
+##set root
+root=paste(proj_path,"earth_sensing_summer_school/data/era5",sep="/")
+
+##set time zone
 timezone="UTC"
 
 ```
@@ -59,6 +73,7 @@ timezone="UTC"
 
 ```{r prep,echo=F,message=F,warning=F,error=F}
 
+##get all downloaded ERA5 files
 nc_files=list.files(path=root,pattern=".nc$")
 years=sort(as.numeric(unique(substr(nc_files,start=1,stop=4))))
 variables=unique(substr(nc_files,start=6,stop=(nchar(nc_files)-3)))
@@ -81,6 +96,9 @@ for (year in years){
   ncin_tmean=nc_open(paste(root,nc_tmean,sep="/"))
   tmean=ncvar_get(ncin_tmean,"t2m")-273.15  ##deg C
   tmean_ts=rbind(tmean_ts,data.frame(tmean=tmean))
+
+  #history=ncatt_get(ncin_tmean,0,"history")$value
+  #history
   
   ##precipitation
   nc_prec=sprintf("%0.0f_total_precipitation.nc",year)
@@ -179,10 +197,13 @@ plot(meteo_daily$dates,meteo_daily$vappres)
 plot(meteo_daily$dates,meteo_daily$windspeed)
 
 
+
+
+
+
 ##save meteo data
 #write.table(meteo_hourly,paste(root,"ERA5_meteo_hourly.csv",sep="/"),sep=";",row.names=F,quote=F)
 write.table(meteo_daily,paste(root,"ERA5_meteo_daily.csv",sep="/"),sep=";",row.names=F,quote=F)
-
 
 ```
 
