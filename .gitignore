@@ -28,7 +28,6 @@ Thumbs.db
 *.war
 # Large media files
 *.mp4
-*.tiff
 *.avi
 *.flv
 *.mov
@@ -47,11 +46,9 @@ Thumbs.db
 *.prj
 *.shx
 *.html
-*.csv
 *.img
 *.hdr
 *.ipynb
-*.tif
 *.gpkg
 *.swp
 ##further data extensions
