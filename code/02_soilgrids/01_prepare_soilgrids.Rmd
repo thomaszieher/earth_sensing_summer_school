@@ -31,7 +31,7 @@ editor_options:
 ##                                                 ##
 #####################################################
 ##  Description: script for preparing soil grids V2.0 profiles at mapped locations for LWF-Brook90
-##  Environment: myenv_r
+##  Environment: myenv_r, R 4.5.1
 #####################################################
 
 ##set include=F to omit header in output
@@ -41,8 +41,6 @@ editor_options:
 
 ```{r setup,include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-
-##todo: prep dtm, https://idt2.regione.veneto.it/idt/downloader/download
 
 ##empty environment
 rm(list=ls())

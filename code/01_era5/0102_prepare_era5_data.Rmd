@@ -31,7 +31,7 @@ editor_options:
 ##                                                 ##
 #####################################################
 ##  Description: Prepare ERA5 meteo time series for LWF-Brook90, 
-##  Environment: renv
+##  Environment: renv, R 4.5.1
 #####################################################
 
 ##set include=F to omit header in output
@@ -49,11 +49,12 @@ rm(list=ls())
 #install.packages("renv")
 
 ##install packages with respective version
+#renv::snapshot()
 renv::restore()
 
 library(ncdf4)
 library(data.table)
-library(rstudioapi) 
+library(rstudioapi)
 
 ##retrieving script path
 proj_path=dirname(rstudioapi::getActiveProject())
@@ -65,7 +66,6 @@ root=paste(proj_path,"earth_sensing_summer_school/data/era5",sep="/")
 timezone="UTC"
 
 ```
-
 
 
 ***
