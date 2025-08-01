@@ -26,12 +26,12 @@ editor_options:
 ##                                                 ##
 ##  Author: Thomas Zieher                          ##
 ##  Institute: Nat Haz, 6.3                        ##
-##  Date: 2023-01-23                               ##
+##  Date: 2025-06-04                               ##
 ##  License: GNU GPL V.3 or later                  ##
 ##                                                 ##
 #####################################################
-##  Description: ADD HERE
-##  Environment: ADD HERE
+##  Description: Processing of S2 L2A imagery for derivation of indices maps and time series analyses
+##  Environment: renv
 #####################################################
 
 ##set include=F to omit header in output
@@ -40,16 +40,18 @@ editor_options:
 
 
 ```{r setup,include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo=T)
 
-##downloaded L2A-data with less than 30% cloud cover
+##empty environment
+rm(list=ls())
 
+##install package renv
+#install.packages("renv")
 
-# install.packages("gdalcubes")
-# install.packages("dplyr")
-# install.packages("terra")
-# install.packages("sf")
-# renv::snapshot()
+##install packages with respective version
+#renv::snapshot()
+renv::restore()
+
 
 library(gdalcubes)
 library(dplyr)
@@ -57,6 +59,7 @@ library(terra)
 library(sf)
 library(raster)
 
+##downloaded L2A-data with less than 30% cloud cover
 path="E:/summer_school_2025/S2"#"F:/RS"#/2023"#"D:/RS/2018"#
 outpath="E:/summer_school_2025"#"F:/RS/indices_maps_2021"#"F:/RS/indices_maps"##_2023"#
 
@@ -549,20 +552,25 @@ ndvi_cube=gdalcubes::raster_cube(s2_coll,v_subarea) |>
 #gdalcubes::write_ncdf(raster_cube(s2_coll,v_subarea),"D:/s2_coll.nc",overwrite=T)
 
 
+bands_cube=gdalcubes::raster_cube(s2_coll,v_subarea)
+gdalcubes::write_tif(bands_cube,paste(outpath,"bands_cube",sep="/"))
 
-# ts_single=gdalcubes::extract_geom(ndvi_cube,whh_pts_utm,warnings=F)
-# ts_single["date"]=as.POSIXct(ts_single$time)
-# ts_single=ts_single[order(ts_single$date),]
-# 
-# plot(NA,NA,xlim=c(as.POSIXct("2019-01-01"),as.POSIXct("2024-12-31")),ylim=c(0,0.5),axes=F,xlab="",ylab="NDVI")
-# xticks=seq(as.POSIXct("2019-01-01"),as.POSIXct("2024-12-31"),by="3 months")
-# axis(side=1,at=xticks,labels=format(xticks,format="%Y-%m"))
-# axis(side=2,las=1)
-# col=c(rep("darkgreen",times=4),rep("red",times=4))
-# for (fid in unique(ts_single$FID)){
-#   ts_single_sub=ts_single[ts_single$FID==fid,]
-#   lines(as.POSIXct(ts_single_sub$date),ts_single_sub$NDVI,col=col[fid],lwd=2)
-# }
+
+##extract s2 ndvi time series
+#ts_single=gdalcubes::extract_geom(ndvi_cube,whh_pts_utm,warnings=F)
+ts_single=gdalcubes::extract_geom(ndvi_cube,whh_pts_utm,warnings=F)
+ts_single["date"]=as.POSIXct(ts_single$time)
+ts_single=ts_single[order(ts_single$date),]
+
+plot(NA,NA,xlim=c(as.POSIXct("2019-01-01"),as.POSIXct("2024-12-31")),ylim=c(0,0.5),axes=F,xlab="",ylab="NDVI")
+xticks=seq(as.POSIXct("2019-01-01"),as.POSIXct("2024-12-31"),by="3 months")
+axis(side=1,at=xticks,labels=format(xticks,format="%Y-%m"))
+axis(side=2,las=1)
+col=c(rep("darkgreen",times=4),rep("red",times=4))
+for (fid in unique(ts_single$FID)){
+  ts_single_sub=ts_single[ts_single$FID==fid,]
+  lines(as.POSIXct(ts_single_sub$date),ts_single_sub$NDVI,col=col[fid],lwd=2)
+}
 
 
 
