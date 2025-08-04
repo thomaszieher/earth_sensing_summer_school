@@ -52,7 +52,13 @@ Figure 3: Example of resulting drought stress indicator time series in a daily r
 * A written report, for which it is recommended to use the ISPRS Annals full-paper templates (in MS Word or LaTeX) from: 
 https://www.isprs.org/documents/orangebook/app5.aspx
 
+<h2>Installation instructions</h2>
 
+1. Install R 4.5.1: https://cran.r-project.org
+2. Install R Studio: https://posit.co/download/rstudio-desktop  
+3. Install GIT: https://git-scm.com/downloads  
+4. Clone repository: https://github.com/thomaszieher/earth_sensing_summer_school.git  
+5. Restore environment with renv::restore()
 
 <h2>References</h2>
 
