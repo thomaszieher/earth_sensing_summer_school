@@ -1,0 +1,438 @@
+---
+title: "Process datacube"
+author: "Thomas Zieher"
+date: "2025-06-04"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r header,include=T}
+#####################################################
+##                                                 ##
+##      ######      #########  ##          ##      ##
+##      #######     ########   ##          ##      ##
+##      ##    ##    ##         ##          ##      ##
+##      ##   ##     ##         ##          ##      ##
+##      ######      ######     ##          ##      ##
+##      #######     #####      ##          ##      ##
+##      ##    ##    ##         ##    ##    ##      ##
+##      ##     ##   ##         ##   ####   ##      ##
+##      ##     ##   ##         ##  ##  ##  ##      ##
+##      ########    ##          ####    ####       ##
+##      #######     ##           ##      ##        ##
+##                                                 ##
+#####################################################
+##                                                 ##
+##  Author: Thomas Zieher                          ##
+##  Institute: Nat Haz, 6.3                        ##
+##  Date: 2025-06-04                               ##
+##  License: GNU GPL V.3 or later                  ##
+##                                                 ##
+#####################################################
+##  Description: Processing of S2 L2A imagery for derivation of indices maps and time series analyses
+##  Environment: renv
+#####################################################
+
+##set include=F to omit header in output
+
+```
+
+
+```{r setup,include=FALSE}
+knitr::opts_chunk$set(echo=T)
+
+##empty environment
+rm(list=ls())
+
+##install package renv
+#install.packages("renv")
+
+##install packages with respective version
+#renv::snapshot()
+renv::restore()
+
+
+library(gdalcubes)
+library(dplyr)
+library(terra)
+library(sf)
+library(ncdf4)
+library(rstudioapi)
+library(corrplot)
+library(RColorBrewer)
+library(aqp)
+proj_path=dirname(rstudioapi::getActiveProject())
+
+##set paths
+root=paste(proj_path,"earth_sensing_summer_school",sep="/")
+soil_path=paste(root,"data/soilgrids",sep="/")
+model_path=paste(root,"data/lwf_brook90",sep="/")
+
+
+##downloaded L2A-data with less than 30% cloud cover
+s2_path="E:/summer_school_2025/S2"
+outpath="E:/summer_school_2025"
+
+
+##read soil data
+soilgrid_profiles=readRDS(paste(soil_path,"soilgrids_profiles.rds",sep="/"))
+##get sites
+sites_raw=aqp::site(soilgrid_profiles)
+sites_wgs84=sf::st_as_sf(sites_raw)
+sites=sf::st_transform(sites_wgs84,"EPSG:32633")
+
+
+
+##set crs, aoi and spatial resolution
+crs_def="32633" #UTM 33N
+left=282000 #m
+right=289000 #m
+bottom=5145000 #m
+top=5152000 #m
+spat_res=20 #m
+
+##create aoi sf
+aoi=sf::st_as_sf(sf::st_sfc(sf::st_polygon(x=list(matrix(c(left,bottom,left,top,right,top,right,bottom,left,bottom),ncol=2,byrow=T))),
+                            crs=sprintf("EPSG:%s",crs_def)))
+
+plot(sf::st_geometry(aoi))
+points(sf::st_geometry(sites),pch=20,col="red")
+
+```
+
+
+
+***
+### Set up gdalcube
+
+```{r s2_cube,echo=F,warning=F,error=F}
+
+# ##get meta data of downloaded scenes
+# files=data.frame(filepath=list.files(s2_path,pattern=".zip",recursive=T,full.names=T),
+#                  filename=list.files(s2_path,pattern=".zip",recursive=T))
+# 
+# files["satellite"]=substr(files$filename,start=1,stop=3)
+# files["type"]=substr(files$filename,start=5,stop=10)
+# files["proc"]=substr(files$filename,start=28,stop=32)
+# files["date"]=as.POSIXct(substr(files$filename,start=12,stop=26),format="%Y%m%dT%H%M%S",tz="UTC")
+# files["tile"]=substr(files$filename,start=39,stop=44)
+# files["day"]=as.POSIXct(substr(files$filename,start=12,stop=26),format="%Y%m%d",tz="UTC")
+# files["month"]=as.numeric(format(files$date,format="%m"))
+# files["year"]=as.numeric(format(files$date,format="%Y"))
+# files=files[order(files$day),]
+# 
+# ##checks
+# any(duplicated(files$date))
+# files[duplicated(files$date)|duplicated(files$date,fromLast=T),]
+# unique(files$proc)
+# 
+# 
+# ##limit to April-September
+# #files=files[files$month%in%c(4:9),]
+# 
+# 
+# ##check data availability
+# xticks=seq(as.POSIXct("2019-01-01"),as.POSIXct("2025-01-01"),by="year")
+# plot(unique(files$day),rep(1,times=length(unique(files$day))),pch=20,axes=F,xlab="",ylab="")
+# axis(side=1,at=xticks,labels=format(xticks,format="%Y"))
+# 
+# 
+# 
+# ##set up datacube
+# ##https://github.com/appelmar/gdalcubes
+# #collection_formats()
+# 
+# ##create image collection
+# s2_coll=gdalcubes::create_image_collection(files$filepath,"Sentinel2_L2A")
+# 
+# 
+# ##set detailed area with higher resolution
+# v_subarea=gdalcubes::cube_view(
+#   extent=list(left=left,right=right,bottom=bottom,top=top,
+#               t0="2019-01-01",t1="2024-12-31"),
+# 
+#   dt="P7D",#"P1M",
+#   dx=spat_res,dy=spat_res,
+#   srs=sprintf("EPSG:%s",crs_def),
+#   aggregation="median",resampling="near"
+#   #aggregation="mean",resampling="near"
+# )
+# 
+# 
+# ##export gdalcube as netcdf
+# #bands_cube=gdalcubes::raster_cube(s2_coll,v_subarea)
+# #gdalcubes::write_ncdf(bands_cube,paste(outpath,"bands_cube_full.nc",sep="/"),pack=T,overwrite=T)
+
+```
+
+
+***
+### Read NetCDF export
+
+```{r netcdf,echo=F,warning=F,error=F}
+
+##read s2 bands
+nc_in=nc_open(paste(outpath,"bands_cube.nc",sep="/"))
+
+##create formatted dates from netcdf infos
+ntstep=nc_in$dim[["time"]]$len
+tsteps=ncvar_get(nc_in,"time")
+tunits=ncatt_get(nc_in,"time","units")
+startd=as.POSIXct(unlist(strsplit(tunits$value," "))[3],format="%Y-%m-%dT%H:%M:%S",tz="UTC")
+dates=startd+tsteps*60*60*24
+
+
+##b1
+b01=terra::t(terra::rast(ncvar_get(nc_in,"B01")))
+terra::set.ext(b01,c(left,right,bottom,top))
+terra::set.crs(b01,sprintf("EPSG:%s",crs_def))
+names(b01)=dates
+
+##b2
+b02=terra::t(terra::rast(ncvar_get(nc_in,"B02")))
+terra::set.ext(b02,c(left,right,bottom,top))
+terra::set.crs(b02,sprintf("EPSG:%s",crs_def))
+names(b02)=dates
+
+##b3
+b03=terra::t(terra::rast(ncvar_get(nc_in,"B03")))
+terra::set.ext(b03,c(left,right,bottom,top))
+terra::set.crs(b03,sprintf("EPSG:%s",crs_def))
+names(b03)=dates
+
+##b4
+b04=terra::t(terra::rast(ncvar_get(nc_in,"B04")))
+terra::set.ext(b04,c(left,right,bottom,top))
+terra::set.crs(b04,sprintf("EPSG:%s",crs_def))
+names(b04)=dates
+
+##b5
+b05=terra::t(terra::rast(ncvar_get(nc_in,"B05")))
+terra::set.ext(b05,c(left,right,bottom,top))
+terra::set.crs(b05,sprintf("EPSG:%s",crs_def))
+names(b05)=dates
+
+##b6
+b06=terra::t(terra::rast(ncvar_get(nc_in,"B06")))
+terra::set.ext(b06,c(left,right,bottom,top))
+terra::set.crs(b06,sprintf("EPSG:%s",crs_def))
+names(b06)=dates
+
+##b7
+b07=terra::t(terra::rast(ncvar_get(nc_in,"B07")))
+terra::set.ext(b07,c(left,right,bottom,top))
+terra::set.crs(b07,sprintf("EPSG:%s",crs_def))
+names(b07)=dates
+
+##b8
+b08=terra::t(terra::rast(ncvar_get(nc_in,"B08")))
+terra::set.ext(b08,c(left,right,bottom,top))
+terra::set.crs(b08,sprintf("EPSG:%s",crs_def))
+names(b08)=dates
+
+##b8a
+b08a=terra::t(terra::rast(ncvar_get(nc_in,"B8A")))
+terra::set.ext(b08a,c(left,right,bottom,top))
+terra::set.crs(b08a,sprintf("EPSG:%s",crs_def))
+names(b08a)=dates
+
+##b9
+b09=terra::t(terra::rast(ncvar_get(nc_in,"B09")))
+terra::set.ext(b09,c(left,right,bottom,top))
+terra::set.crs(b09,sprintf("EPSG:%s",crs_def))
+names(b09)=dates
+
+##b11
+b11=terra::t(terra::rast(ncvar_get(nc_in,"B11")))
+terra::set.ext(b11,c(left,right,bottom,top))
+terra::set.crs(b11,sprintf("EPSG:%s",crs_def))
+names(b11)=dates
+
+##b12
+b12=terra::t(terra::rast(ncvar_get(nc_in,"B12")))
+terra::set.ext(b12,c(left,right,bottom,top))
+terra::set.crs(b12,sprintf("EPSG:%s",crs_def))
+names(b12)=dates
+
+
+##example
+plot(b02[[5]])
+plot(sf::st_geometry(aoi),add=T,border="red",lwd=2)
+points(sf::st_geometry(sites),pch=20,col="red")
+
+
+```
+
+
+***
+### Time series analyses
+
+```{r ts,echo=F,warning=F,error=F}
+
+##extract band time series
+pid="P3"#"P1"
+location=sites[sites$id==pid,]
+
+ts_single=data.frame(date=dates)
+ts_single=cbind(ts_single,data.frame(t(terra::extract(b01,location)))[-1,])
+ts_single=cbind(ts_single,data.frame(t(terra::extract(b02,location)))[-1,])
+ts_single=cbind(ts_single,data.frame(t(terra::extract(b03,location)))[-1,])
+ts_single=cbind(ts_single,data.frame(t(terra::extract(b04,location)))[-1,])
+ts_single=cbind(ts_single,data.frame(t(terra::extract(b05,location)))[-1,])
+ts_single=cbind(ts_single,data.frame(t(terra::extract(b06,location)))[-1,])
+ts_single=cbind(ts_single,data.frame(t(terra::extract(b07,location)))[-1,])
+ts_single=cbind(ts_single,data.frame(t(terra::extract(b08,location)))[-1,])
+ts_single=cbind(ts_single,data.frame(t(terra::extract(b08a,location)))[-1,])
+ts_single=cbind(ts_single,data.frame(t(terra::extract(b09,location)))[-1,])
+ts_single=cbind(ts_single,data.frame(t(terra::extract(b11,location)))[-1,])
+ts_single=cbind(ts_single,data.frame(t(terra::extract(b12,location)))[-1,])
+names(ts_single)=c("date","b01","b02","b03","b04","b05","b06","b07","b08","b08a","b09","b11","b12")
+
+
+##compute selected indices
+##check https://github.com/awesome-spectral-indices/awesome-spectral-indices
+
+# ##S-2 bands
+# # Description   Standard	Spectral Range (nm)   Sentinel-2
+# # Aerosols      A         400 - 455             B01
+# # Blue          B         450 - 530             B02
+# # Green         G         510 - 600             B03
+# # Red           R         620 - 690             B04
+# # Red Edge 1	  RE1       695 - 715             B05
+# # Red Edge 2	  RE2       730 - 750             B06
+# # Red Edge 3	  RE3       765 - 795             B07
+# # NIR           N         760 - 900             B08
+# # NIR 2         N2        850 - 880             B8A
+# # Water Vapour  WV        930 - 960             B09
+# # SWIR 1        S1        1550 - 1750           B11
+# # SWIR 2        S2        2080 - 2350           B12
+
+##omit nas
+ts_single_clean=na.omit(ts_single)
+
+
+# ##EVI=g*(N-R)/(N+C1*R-C2*B+L)
+# ##coefficients g, C1, C2, L: https://kaflekrishna.com.np/blog-detail/enhanced-vegetation-index-evi-sentinel-2-image-google-earth-engine/
+# ##EVI=2.5*((B08-B04)/(B08+6*B04-7.5*B02+1))
+ts_single_clean["evi"]=2.5*((ts_single_clean$b08-ts_single_clean$b04)/(ts_single_clean$b08+6.0*ts_single_clean$b04-7.5*ts_single_clean$b02+1))
+
+
+# ##FCVI=N-((R+G+B)/3.0)
+# ##FCVI=B08-((B02+B03+B04)/3.0)
+ts_single_clean["fcvi"]=ts_single_clean$b08-(ts_single_clean$b02+ts_single_clean$b03+ts_single_clean$b04/3.0)
+
+
+# ##IRECI=(RE3-R)/(RE1/RE2)
+# ##IRECI=(B07-B04)/(B05/B06)
+ts_single_clean["ireci"]=(ts_single_clean$b07-ts_single_clean$b04)/(ts_single_clean$b05/ts_single_clean$b06)
+
+
+# ##MSAVI=0.5*(2.0*N+1-(((2*N+1)**2)-8*(N-R))**0.5)
+# ##MSAVI=0.5*(2.0*B08+1.0-(((2*B08+1)^2.0)-8.0*(B08-B04))^0.5)
+ts_single_clean["msavi"]=0.5*(2.0*ts_single_clean$b08+1.0-(((2.0*ts_single_clean$b08+1.0)**2.0)-8.0*(ts_single_clean$b08-ts_single_clean$b04))**0.5)
+
+
+# ##MSI=S1/N
+# ##MSI=B11/B08
+ts_single_clean["msi"]=ts_single_clean$b11/ts_single_clean$b08
+
+
+# ##NDMI=(N-S1)/(N+S1)
+# ##NDMI=(B08-B11)/(B08+B11)
+ts_single_clean["ndmi"]=(ts_single_clean$b08-ts_single_clean$b11)/(ts_single_clean$b08+ts_single_clean$b11)
+
+
+# ##NDREI=(N-RE1)/(N+RE1)
+# ##NDREI=(B08-B05)/(B08+B05)
+ts_single_clean["ndrei"]=(ts_single_clean$b08-ts_single_clean$b05)/(ts_single_clean$b08+ts_single_clean$b05)
+
+
+# ##NIRv=((N-R)/(N+R))*N
+# ##NIRv=((B08-B04)/(B08+B04))*B08
+ts_single_clean["nirv"]=((ts_single_clean$b08-ts_single_clean$b04)/(ts_single_clean$b08+ts_single_clean$b04))*ts_single_clean$b08
+
+
+# ##NMDI=(N-(S1-S2))/(N+(S1-S2))
+# ##NMDI=(B08-(B11-B12))/(B08+(B11-B12))
+ts_single_clean["nmdi"]=(ts_single_clean$b08-(ts_single_clean$b11-ts_single_clean$b12))/(ts_single_clean$b08+(ts_single_clean$b11-ts_single_clean$b12))
+
+
+# ##RENDVI=(RE2-RE1)/(RE2+RE1)
+# ##RENDVI=(B12-B11)/(B12+B11)
+ts_single_clean["rendvi"]=(ts_single_clean$b12-ts_single_clean$b11)/(ts_single_clean$b12+ts_single_clean$b11)
+
+
+# ##S2REP=705.0+35.0*((((RE3+R)/2.0)-RE1)/(RE2-RE1))
+# ##S2REP=705.0+35.0*((((B07+B04)/2.0)-B05)/(B06-B05))
+ts_single_clean["s2rep"]=705.0+35.0*((((ts_single_clean$b07+ts_single_clean$b04)/2.0)-ts_single_clean$b05)/(ts_single_clean$b06-ts_single_clean$b05))
+
+
+# ##SAVI=(1.0+L)*(N-R)/(N+R+L)
+# ##SAVI=(1.0+0.19)*(B08-B04)/(B08+B04+0.19)
+ts_single_clean["savi"]=(1.0+0.19)*(ts_single_clean$b08-ts_single_clean$b04)/(ts_single_clean$b08+ts_single_clean$b04+0.19)
+
+
+# ##GNDVI=(N-G)/(N+G)
+# ##GNDVI=(B08-B03)/(B08+B03)
+ts_single_clean["gndvi"]=(ts_single_clean$b08-ts_single_clean$b03)/(ts_single_clean$b08+ts_single_clean$b03)
+
+
+# ##GVMI=((N+0.1)-(S2+0.02))/((N+0.1)+(S2+0.02))
+# ##GVMI=((B08+0.1)-(B12+0.02))/((B08+0.1)+(B12+0.02))
+ts_single_clean["gvmi"]=((ts_single_clean$b08+0.1)-(ts_single_clean$b12+0.02))/((ts_single_clean$b08+0.1)+(ts_single_clean$b12+0.02))
+
+
+# ##NDVI=(N-R)/(N+R)
+# ##NDVI=(B08-B04)/(B08+B04)
+ts_single_clean["ndvi"]=(ts_single_clean$b08-ts_single_clean$b04)/(ts_single_clean$b08+ts_single_clean$b04)
+
+
+##evi, fcvi, ireci, msavi, msi, ndmi, ndrei, nirv, nmdi, rendvi, s2rep, savi, gndvi, gvmi, ndvi
+plot(ts_single_clean$date,ts_single_clean$evi,type="l",ylim=c(-1,1),xlab="",ylab="Indices value")
+lines(ts_single_clean$date,ts_single_clean$fcvi,type="l")
+lines(ts_single_clean$date,ts_single_clean$ireci,type="l")
+lines(ts_single_clean$date,ts_single_clean$msavi,type="l")
+lines(ts_single_clean$date,ts_single_clean$msi,type="l")
+lines(ts_single_clean$date,ts_single_clean$ndmi,type="l")
+lines(ts_single_clean$date,ts_single_clean$ndrei,type="l")
+lines(ts_single_clean$date,ts_single_clean$nirv,type="l")
+lines(ts_single_clean$date,ts_single_clean$ndmi,type="l")
+lines(ts_single_clean$date,ts_single_clean$rendvi,type="l")
+lines(ts_single_clean$date,ts_single_clean$s2rep,type="l")
+lines(ts_single_clean$date,ts_single_clean$savi,type="l")
+lines(ts_single_clean$date,ts_single_clean$gndvi,type="l")
+lines(ts_single_clean$date,ts_single_clean$gvmi,type="l")
+lines(ts_single_clean$date,ts_single_clean$ndvi,type="l")
+
+
+##check correlation
+m=cor(ts_single_clean[,c("evi","fcvi","ireci","msavi","msi","ndmi","ndrei","nirv","nmdi","rendvi","s2rep","savi","gndvi","gvmi","ndvi")])
+corrplot(m,type="lower",col=brewer.pal(n=8, name="RdYlBu"))
+
+
+```
+
+
+***
+### Compare with model results
+
+```{r comp,echo=F,warning=F,error=F}
+
+##read model results
+mod_res=read.table(paste(model_path,sprintf("wb_indices_%s.csv",pid),sep="/"),header=T,sep=";")
+mod_res$date=as.POSIXct(mod_res$date,tz="UTC")
+
+plot(mod_res$date,mod_res$relawat,type="l",xlab="",ylab="Relawat")
+par(new=T)
+plot(ts_single_clean$date,ts_single_clean$evi,type="o",pch=20,col="red",axes=F,xlab="",ylab="")
+mtext(side=4,"NDVI",line=3)
+
+
+##We need to refine the model parameterization first!
+
+```
+
+
+
+

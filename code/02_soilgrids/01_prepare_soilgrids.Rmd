@@ -73,6 +73,21 @@ soilgrids_path=paste(root,"data/soilgrids",sep="/")
 
 
 ***
+### Define points of interest
+
+```{r poi,echo=T,warning=F,error=F}
+
+sites=data.frame(id=c("P1","P2","P3"),
+                 lon=c(12.215,12.1797,12.2125),
+                 lat=c(46.449,46.4465,46.4685),
+                 aspect=c(290,40,210),
+                 slope=c(25,30,30)
+)
+
+```
+
+
+***
 ### Soil grids data
 
 ```{r soil_grids,echo=F,message=F,warning=F,error=F}
@@ -130,12 +145,6 @@ propext=function(raststack,point){
 
 
 ##prepare soil profile sites
-sites=data.frame(id=c("P1"),
-                 lon=c(12.215),
-                 lat=c(46.449),
-                 aspect=c(290),
-                 slop=c(25)
-)
 sites["rowid"]=1:nrow(sites)
 soil_sites=st_as_sf(sites,coords=c("lon","lat"))
 st_crs(soil_sites)=4326
