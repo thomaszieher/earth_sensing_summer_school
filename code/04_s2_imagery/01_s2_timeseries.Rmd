@@ -162,7 +162,7 @@ points(sf::st_geometry(sites),pch=20,col="red")
 # 
 # ##export gdalcube as netcdf
 # #bands_cube=gdalcubes::raster_cube(s2_coll,v_subarea)
-# #gdalcubes::write_ncdf(bands_cube,paste(outpath,"bands_cube_full.nc",sep="/"),pack=T,overwrite=T)
+# #gdalcubes::write_ncdf(bands_cube,paste(outpath,"e3s_bands_cube.nc",sep="/"),pack=T,overwrite=T)
 
 ```
 
@@ -173,7 +173,7 @@ points(sf::st_geometry(sites),pch=20,col="red")
 ```{r netcdf,echo=F,warning=F,error=F}
 
 ##read s2 bands
-nc_in=nc_open(paste(outpath,"bands_cube.nc",sep="/"))
+nc_in=nc_open(paste(outpath,"e3s_bands_cube.nc",sep="/"))
 
 ##create formatted dates from netcdf infos
 ntstep=nc_in$dim[["time"]]$len

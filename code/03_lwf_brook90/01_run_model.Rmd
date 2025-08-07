@@ -363,6 +363,9 @@ dygraph(tseries_plot,width=600,height=400) %>%
 ```
 
 
+***
+### Check soil water storage in individual soil layers
+
 ```{r swati,echo=F,warning=F,error=F}
 
 ##bind evap-fluxes from result lists
@@ -421,18 +424,18 @@ for (year_plot in unique(output_beech$yr)){
   spruce_sub=output_spruce[output_spruce$yr==year_plot,]
   mixed_sub=mixed[mixed$yr==year_plot,]
   
-  plot(NA,NA,xlim=c(1,366),ylim=c(0,1),xlab="",ylab="Transpiration deficit [mm]",main=sprintf("Transpiration deficit %i",year_plot))
+  plot(NA,NA,xlim=c(1,366),ylim=c(0,1),xlab="",ylab="Transpiration ratio",main=sprintf("Transpiration ratio %i",year_plot))
   
-  lines(beech_sub$doy,beech_sub$tdef,col=col_beech)
-  lines(spruce_sub$doy,spruce_sub$tdef,col=col_spruce)
-  lines(mixed_sub$doy,mixed_sub$tdef,col=col_mixed)
+  lines(beech_sub$doy,beech_sub$tratio,col=col_beech)
+  lines(spruce_sub$doy,spruce_sub$tratio,col=col_spruce)
+  lines(mixed_sub$doy,mixed_sub$tratio,col=col_mixed)
 
-  points(beech_sub$doy[beech_sub$tdef<quantile(na.omit(beech_sub$tdef),0.01)],
-         beech_sub$tdef[beech_sub$tdef<quantile(na.omit(beech_sub$tdef),0.01)],col=col_beech,pch=1)
-  points(spruce_sub$doy[spruce_sub$tdef<quantile(na.omit(spruce_sub$tdef),0.01)],
-         spruce_sub$tdef[spruce_sub$tdef<quantile(na.omit(spruce_sub$tdef),0.01)],col=col_spruce,pch=3)
-  points(mixed_sub$doy[mixed_sub$tdef<quantile(na.omit(mixed_sub$tdef),0.01)],
-         mixed_sub$tdef[mixed_sub$tdef<quantile(na.omit(mixed_sub$tdef),0.01)],col=col_mixed,pch=5)
+  points(beech_sub$doy[beech_sub$tratio<quantile(na.omit(beech_sub$tratio),0.01)],
+         beech_sub$tratio[beech_sub$tratio<quantile(na.omit(beech_sub$tratio),0.01)],col=col_beech,pch=1)
+  points(spruce_sub$doy[spruce_sub$tratio<quantile(na.omit(spruce_sub$tratio),0.01)],
+         spruce_sub$tratio[spruce_sub$tratio<quantile(na.omit(spruce_sub$tratio),0.01)],col=col_spruce,pch=3)
+  points(mixed_sub$doy[mixed_sub$tratio<quantile(na.omit(mixed_sub$tratio),0.01)],
+         mixed_sub$tratio[mixed_sub$tratio<quantile(na.omit(mixed_sub$tratio),0.01)],col=col_mixed,pch=5)
   
   
   ##plot thresholds
@@ -510,18 +513,18 @@ for (year_plot in unique(output_beech$yr)){
   spruce_sub=output_spruce[output_spruce$yr==year_plot,]
   mixed_sub=mixed[mixed$yr==year_plot,]
   
-  plot(NA,NA,xlim=c(1,366),ylim=c(0,1),xlab="",ylab="Transpiration ratio",main=sprintf("Transpiration ratio %i",year_plot))
+  plot(NA,NA,xlim=c(1,366),ylim=c(0,8),xlab="",ylab="Transpiration deficit [mm]",main=sprintf("Transpiration deficit %i",year_plot))
   
-  lines(beech_sub$doy,beech_sub$tratio,col=col_beech)
-  lines(spruce_sub$doy,spruce_sub$tratio,col=col_spruce)
-  lines(mixed_sub$doy,mixed_sub$tratio,col=col_mixed)
+  lines(beech_sub$doy,beech_sub$tdef,col=col_beech)
+  lines(spruce_sub$doy,spruce_sub$tdef,col=col_spruce)
+  lines(mixed_sub$doy,mixed_sub$tdef,col=col_mixed)
 
-  points(beech_sub$doy[beech_sub$tratio<quantile(na.omit(beech_sub$tratio),0.01)],
-         beech_sub$tratio[beech_sub$tratio<quantile(na.omit(beech_sub$tratio),0.01)],col=col_beech,pch=1)
-  points(spruce_sub$doy[spruce_sub$tratio<quantile(na.omit(spruce_sub$tratio),0.01)],
-         spruce_sub$tratio[spruce_sub$tratio<quantile(na.omit(spruce_sub$tratio),0.01)],col=col_spruce,pch=3)
-  points(mixed_sub$doy[mixed_sub$tratio<quantile(na.omit(mixed_sub$tratio),0.01)],
-         mixed_sub$tratio[mixed_sub$tratio<quantile(na.omit(mixed_sub$tratio),0.01)],col=col_mixed,pch=5)
+  points(beech_sub$doy[beech_sub$tdef<quantile(na.omit(beech_sub$tdef),0.01)],
+         beech_sub$tdef[beech_sub$tdef<quantile(na.omit(beech_sub$tdef),0.01)],col=col_beech,pch=1)
+  points(spruce_sub$doy[spruce_sub$tdef<quantile(na.omit(spruce_sub$tdef),0.01)],
+         spruce_sub$tdef[spruce_sub$tdef<quantile(na.omit(spruce_sub$tdef),0.01)],col=col_spruce,pch=3)
+  points(mixed_sub$doy[mixed_sub$tdef<quantile(na.omit(mixed_sub$tdef),0.01)],
+         mixed_sub$tdef[mixed_sub$tdef<quantile(na.omit(mixed_sub$tdef),0.01)],col=col_mixed,pch=5)
   
   
   ##plot thresholds
@@ -531,7 +534,6 @@ for (year_plot in unique(output_beech$yr)){
   legend("bottomright",legend=c("Beech","Spruce","Mixed"),lwd=2,pch=1:5,col=cols_treesp)
   
 }
-
 
 
 ##dygraph
