@@ -76,6 +76,72 @@ soil_path=paste(root,"data/soilgrids",sep="/")
 start_date=as.Date("2019-01-01")
 end_date=as.Date("2024-12-31")
 
+
+##plot soil profile
+soilplot=function(soil,hum_depth=0.0,plots=T){
+
+  maxdepth=min(soil$lower)*-100
+  
+  ##start empty plot
+  plot(NA,NA,xlim=c(0,1),ylim=c(maxdepth,hum_depth*100),
+       xlab="",ylab="",las=1,axes=F)
+  
+  ##prepare axes
+  axis(side=2,las=1,at=seq(0,maxdepth,10),mgp=c(0,0.8,0),tck=-0.025)
+  mtext(side=2,"Depth [cm]",line=2.5)
+  
+  mtext(side=3,"Soil texture fractions [%]",line=2.5)
+  axis(side=3,at=seq(0,1,length.out=5),labels=seq(0,100,length.out=5))
+
+  ##go through horizons
+  #line=2
+  for (line in 1:nrow(soil)){
+    
+    if (soil$hor_num[line]==0){
+      polygon(x=c(0,1,1,0),
+        y=c(-soil$upper[line]*100,-soil$upper[line]*100,-soil$lower[line]*100,-soil$lower[line]*100),
+        col="#00bb0050"
+      )
+    }
+    
+    ##add skelettgehalt
+    polygon(x=c(0,(0+(soil$gravel[line])),(0+(soil$gravel[line])),0),
+            y=c(-soil$upper[line]*100,-soil$upper[line]*100,-soil$lower[line]*100,-soil$lower[line]*100),
+            col="#11111150"
+    )
+    
+    ##plot texture content
+    start_texture=(soil$gravel[line])
+    texture=soil[line,c("sand","silt","clay","gravel")]
+    texture$sand_scaled=texture$sand*(1-texture$gravel)
+    texture$silt_scaled=texture$silt*(1-texture$gravel)
+    texture$clay_scaled=texture$clay*(1-texture$gravel)
+
+    polygon(x=c(start_texture,
+                start_texture+(texture$sand_scaled/100.0),
+                start_texture+(texture$sand_scaled/100.0),
+                start_texture),
+            y=c(-soil$upper[line]*100,-soil$upper[line]*100,-soil$lower[line]*100,-soil$lower[line]*100),
+            col="#ff000030"
+    )
+    polygon(x=c(start_texture+(texture$sand_scaled/100.0),
+                start_texture+(texture$sand_scaled/100.0)+(texture$silt_scaled/100.0),
+                start_texture+(texture$sand_scaled/100.0)+(texture$silt_scaled/100.0),
+                start_texture+(texture$sand_scaled/100.0)),
+            y=c(-soil$upper[line]*100,-soil$upper[line]*100,-soil$lower[line]*100,-soil$lower[line]*100),
+            col="#ffaa0030"
+    )
+    polygon(x=c(start_texture+(texture$sand_scaled/100.0)+(texture$silt_scaled/100.0),
+                start_texture+(texture$sand_scaled/100.0)+(texture$silt_scaled/100.0)+(texture$clay_scaled/100.0),
+                start_texture+(texture$sand_scaled/100.0)+(texture$silt_scaled/100.0)+(texture$clay_scaled/100.0),
+                start_texture+(texture$sand_scaled/100.0)+(texture$silt_scaled/100.0)),
+            y=c(-soil$upper[line]*100,-soil$upper[line]*100,-soil$lower[line]*100,-soil$lower[line]*100),
+            col="#ffff0030"
+    )
+
+  }
+}
+
 ```
 
 
@@ -88,11 +154,11 @@ end_date=as.Date("2024-12-31")
 meteo_daily=data.table(read.table(paste(meteo_path,"ERA5_meteo_daily.csv",sep="/"),header=T,sep=";",stringsAsFactors=F))
 meteo_daily$dates=as.Date(meteo_daily$dates)
 
-##adjust meteo
-meteo_daily$prec=meteo_daily$prec*0.5
-meteo_daily$tmean=meteo_daily$tmean+5.0
-meteo_daily$tmin=meteo_daily$tmin+5.0
-meteo_daily$tmax=meteo_daily$tmax+5.0
+# ##adjust meteo
+# meteo_daily$prec=meteo_daily$prec*0.5
+# meteo_daily$tmean=meteo_daily$tmean+5.0
+# meteo_daily$tmin=meteo_daily$tmin+5.0
+# meteo_daily$tmax=meteo_daily$tmax+5.0
 
 
 ##Walther-Lieth diagram
@@ -155,34 +221,49 @@ soil=profiles[profiles$id==pid,]
 ##modifications for LWF-Brook90
 soil["upper"]=soil$upr/100.0*-1.0
 soil["lower"]=soil$lwr/100.0*-1.0
+soil["hor_num"]=1:nrow(soil)
+
+soilplot(soil)
 
 
-##individual soil parameterization
-nlayers=6
-max_depth=-0.5#-0.2##-1##
-soil_raw=data.table()
-soil_raw$lower=max_depth
-soil_loc=soil_raw[rep(seq(1,nrow(soil_raw)),nlayers)]
-soil_loc$hor_num=1:nlayers
-soil_loc$gravel=0.8
-soil_loc$corg=2
-soil_loc$topsoil=rep(c(1,0),each=(nlayers/2))
-soil_loc$bd=1.0##1.5##2.0##
-soil_loc$upper=seq(0,(max_depth-(soil_raw$lower/nlayers)),length.out=nlayers)
-soil_loc$lower=seq((soil_raw$lower/nlayers),max_depth,length.out=nlayers)
-soil_loc$dw=15
 
-soil_loc$clay=30
-soil_loc$silt=50
-soil_loc$sand=20
+# ##individual soil parameterization
+# nlayers=6 ##number of mineral soil layers
+# max_depth=-0.5#-0.2##-1##
+# soil_raw=data.table()
+# soil_raw$lower=max_depth
+# soil_loc=soil_raw[rep(seq(1,nrow(soil_raw)),nlayers)]
+# soil_loc$hor_num=1:nlayers
+# soil_loc$gravel=0.8
+# soil_loc$corg=2
+# soil_loc$topsoil=rep(c(1,0),each=(nlayers/2))
+# soil_loc$bd=1.0##1.5##2.0##
+# soil_loc$upper=seq(0,(max_depth-(soil_raw$lower/nlayers)),length.out=nlayers)
+# soil_loc$lower=c(soil_loc$upper[2:nrow(soil_loc)],max_depth)
+# soil_loc$dw=15
+# 
+# soil_loc$clay=30
+# soil_loc$silt=50
+# soil_loc$sand=20
+# 
+# soil_loc=data.table(cbind(soil_loc,LWFBrook90R::hydpar_hypres(clay=soil_loc$clay,
+#                                                               silt=soil_loc$silt,
+#                                                               bd=soil_loc$bd,
+#                                                               oc.pct=soil_loc$corg,
+#                                                               topsoil=soil_loc$topsoil)))
+# 
+# ##add humus layer
+# hum_depth=-0.1 #m
+# hum_layer=data.table(lower=hum_depth,hor_num=0,gravel=NA,corg=NA,topsoil=NA,bd=NA,upper=0,dw=NA,clay=NA,silt=NA,sand=NA,
+#                      LWFBrook90R::hydpar_ff_b90())
+# soil_loc$upper=seq(0,(max_depth-(soil_raw$lower/nlayers)),length.out=nlayers)+hum_depth
+# soil_loc$lower=c(soil_loc$upper[2:nrow(soil_loc)],max_depth+hum_depth)
+# soil_loc=rbind(hum_layer,soil_loc)
+# 
+# soil=soil_loc
+# 
+# soilplot(soil,hum_depth=hum_depth)
 
-soil_loc=data.table(cbind(soil_loc,hydpar_hypres(clay=soil_loc$clay,
-                                                 silt=soil_loc$silt,
-                                                 bd=soil_loc$bd,
-                                                 oc.pct=soil_loc$corg,
-                                                 topsoil=soil_loc$topsoil)))
-
-soil=soil_loc
 
 ```
 
@@ -364,6 +445,56 @@ dygraph(tseries_plot,width=600,height=400) %>%
 
 
 ***
+### Calculate indices
+
+```{r indices,echo=F,warning=F,error=F}
+
+##re-read outputs
+output_beech=wb_beech
+output_spruce=wb_spruce
+
+##indices beech
+output_beech$tratio=output_beech$tran/output_beech$ptran
+output_beech$tratio[output_beech$tratio>1]=1
+output_beech$tratio[is.nan(output_beech$tratio)]=1
+output_beech$tratio[is.infinite(output_beech$tratio)]=1
+output_beech$tdef=output_beech$ptran-output_beech$tran
+output_beech$tdef[output_beech$tdef<0]=0
+
+##indices spruce
+output_spruce$tratio=output_spruce$tran/output_spruce$ptran
+output_spruce$tratio[output_spruce$tratio>1]=1
+output_spruce$tratio[is.nan(output_spruce$tratio)]=1
+output_spruce$tratio[is.infinite(output_spruce$tratio)]=1
+output_spruce$tdef=output_spruce$ptran-output_spruce$tran
+output_spruce$tdef[output_spruce$tdef<0]=0
+
+##calc indices for mixed forest
+mixed=data.frame(doy=output_beech$doy,
+                 yr=output_beech$yr,
+                 date=output_beech$date,
+                 rnet=apply(cbind(output_beech$rnet,output_spruce$rnet),1,FUN="mean",na.rm=T),
+                 smlt=apply(cbind(output_beech$smlt,output_spruce$smlt),1,FUN="mean",na.rm=T),
+                 relawat=apply(cbind(output_beech$relawat,output_spruce$relawat),1,FUN="mean",na.rm=T),
+                 tdef=apply(cbind(output_beech$tdef,output_spruce$tdef),1,FUN="mean",na.rm=T),
+                 tratio=apply(cbind(output_beech$tratio,output_spruce$tratio),1,FUN="mean",na.rm=T)
+)
+
+
+##define colors
+col_beech="#ff916e"
+col_spruce="#159837"
+col_mixed="#a387ff"
+cols_treesp=c(col_beech,col_spruce,col_mixed)
+
+##prec and snow melt
+prec=xts(mixed$rnet[mixed$yr%in%unique(output_beech$yr)],order.by=mixed$date[mixed$yr%in%unique(output_beech$yr)])
+smlt=xts(mixed$smlt[mixed$yr%in%unique(output_beech$yr)],order.by=mixed$date[mixed$yr%in%unique(output_beech$yr)])
+
+```
+
+
+***
 ### Check soil water storage in individual soil layers
 
 ```{r swati,echo=F,warning=F,error=F}
@@ -375,6 +506,164 @@ swat_spruce=rbindlist(list(`Spruce`=res_spruce$layer_output),
 swat_beech=rbindlist(list(`Beech`=res_beech$layer_output),
                      idcol="vegetation")
 
+
+##add dates to outputs
+swat_spruce[,dates:=as.POSIXct(paste(yr,mo,da,sep="-"),tz="UTC")]
+swat_beech[,dates:=as.POSIXct(paste(yr,mo,da,sep="-"),tz="UTC")]
+
+##get theta at topmost soil layer
+swat_spruce_nl1=swat_spruce[which(nl==1),list(theta=mean(theta)),by=dates]
+swat_beech_nl1=swat_beech[which(nl==1),list(theta=mean(theta)),by=dates]
+
+##compare
+ts_swat_spruce_nl1=xts(swat_spruce_nl1$theta*100,order.by=swat_spruce_nl1$dates)
+ts_swat_beech_nl1=xts(swat_beech_nl1$theta*100,order.by=swat_beech_nl1$dates)
+tseries_plot_5cm=merge(prec,smlt,ts_swat_beech_nl1,ts_swat_spruce_nl1)
+
+##fill missing 15min measurements with closest measurement
+#tseries_smc_filled=na.locf(tseries_plot,fromLast=F,maxgap=10)
+
+##plot
+cols_prec=c("#F39200","#86E29E","#0800ff","#50ffff")
+par(mar=c(5,5,5,5))
+dygraph(tseries_plot_5cm,width="auto",height=400) %>%
+  dyAxis("y",label="Soil moisture content [%]",valueRange=c(20,60)) %>%
+  dyAxis("y2",label="Precipitation [mm/d]",valueRange=c(50,0)) %>%
+  dyBarSeries('prec',label="Rainfall [mm/d]",axis="y2") %>%  
+  dyBarSeries('smlt',label="Snow melt [mm/d]",axis="y2") %>% 
+  dyOptions(stackedGraph=T,colors=cols_prec) %>%
+  dySeries('ts_swat_beech_nl1',label="SMC beech nl1 [%]",axis="y") %>%
+  dySeries('ts_swat_spruce_nl1',label="SMC spruce nl1 [%]",axis="y") %>%
+  dyRangeSelector(height=20) %>%
+  dyOptions(stackedGraph=F,colors=cols_prec) %>%
+  dyLegend()
+
+```
+
+
+***
+### Relative extractable water (REW) per DOY
+Values <Q01 are shown as point markers
+
+```{r rew_plot,echo=F,warning=F,error=F,out.width="80%",fig.width=10,fig.height=13}
+
+##plot all years
+par(mfrow=c(6,1),mar=c(2,4,3,1),pty="m")
+#year_plot=unique(output_beech$yr)[1]
+for (year_plot in unique(output_beech$yr)){
+  beech_sub=output_beech[output_beech$yr==year_plot,]
+  spruce_sub=output_spruce[output_spruce$yr==year_plot,]
+  mixed_sub=mixed[mixed$yr==year_plot,]
+  
+  plot(NA,NA,xlim=c(1,366),ylim=c(0,2),xlab="",ylab="Relative extractable water",main=sprintf("Relative extractable water %i",year_plot))
+  lines(beech_sub$doy,beech_sub$relawat,col=col_beech)
+  lines(spruce_sub$doy,spruce_sub$relawat,col=col_spruce)
+  lines(mixed_sub$doy,mixed_sub$relawat,col=col_mixed)
+
+  points(beech_sub$doy[beech_sub$relawat<quantile(na.omit(beech_sub$relawat),0.01)],
+         beech_sub$relawat[beech_sub$relawat<quantile(na.omit(beech_sub$relawat),0.01)],col=col_beech,pch=1)
+  points(spruce_sub$doy[spruce_sub$relawat<quantile(na.omit(spruce_sub$relawat),0.01)],
+         spruce_sub$relawat[spruce_sub$relawat<quantile(na.omit(spruce_sub$relawat),0.01)],col=col_spruce,pch=3)
+  points(mixed_sub$doy[mixed_sub$relawat<quantile(na.omit(mixed_sub$relawat),0.01)],
+         mixed_sub$relawat[mixed_sub$relawat<quantile(na.omit(mixed_sub$relawat),0.01)],col=col_mixed,pch=5)
+  
+  ##plot thresholds
+  abline(h=0.2,col="red",lty=2)
+  abline(h=0.4,col="orange",lty=2)
+  abline(h=1,col="green",lty=2)
+  
+  legend("topright",legend=c("Beech","Spruce","Mixed"),lwd=2,pch=c(1,3,5),col=cols_treesp)
+  
+}
+
+
+##dygraph
+cols=c("#0800ff","#44bbff",cols_treesp)
+##rfal and smlt from model results
+Beech=xts(output_beech$relawat[output_beech$yr%in%unique(output_beech$yr)],order.by=output_beech$date[output_beech$yr%in%unique(output_beech$yr)])
+Spruce=xts(output_spruce$relawat[output_spruce$yr%in%unique(output_beech$yr)],order.by=output_spruce$date[output_spruce$yr%in%unique(output_beech$yr)])
+Mixed=xts(mixed$relawat[mixed$yr%in%unique(output_beech$yr)],order.by=mixed$date[mixed$yr%in%unique(output_beech$yr)])
+
+tseries_plot=merge(prec,smlt,Beech,Spruce,Mixed)
+
+##fill missing 15min measurements with closest measurement
+#tseries_smc_filled=na.locf(tseries_plot,fromLast=F,maxgap=10)
+
+dygraphs::dygraph(tseries_plot,width=600,height=400) %>%
+  dyAxis("y",label="Relative extractable water (REW)",valueRange=c(0,2)) %>%
+  dyAxis("y2",label="Net rainfall & snow melt (mixed forest) [mm]",valueRange=c(50,0)) %>%
+  dyGroup(c("Beech","Spruce","Mixed"),drawPoints=F,color=cols_treesp,axis="y") %>%
+  dyLimit(0.2,strokePattern="dashed",color="red") %>%
+  dyLimit(0.4,strokePattern="dashed",color="orange") %>%
+  dyLimit(1,strokePattern="dashed",color="green") %>%
+  dyOptions(stackedGraph=F,colors=cols) %>%
+  dyBarSeries('prec',label="Net rainfall [mm/d]",axis="y2") %>% 
+  dyBarSeries('smlt',label="Snow melt [mm/d]",axis="y2") %>%
+  dyRangeSelector(height=20) %>%
+  dyLegend(show="always",width=120)
+
+```
+
+
+***
+### T_def per DOY
+Values <Q01 are shown as point markers
+
+```{r tdef,echo=F,warning=F,error=F,out.width="80%",fig.width=10,fig.height=13}
+
+##plot all years
+par(mfrow=c(6,1),mar=c(2,4,3,1),pty="m")
+#year_plot=unique(output_beech$yr)[1]
+for (year_plot in unique(output_beech$yr)){
+  beech_sub=output_beech[output_beech$yr==year_plot,]
+  spruce_sub=output_spruce[output_spruce$yr==year_plot,]
+  mixed_sub=mixed[mixed$yr==year_plot,]
+  
+  plot(NA,NA,xlim=c(1,366),ylim=c(0,8),xlab="",ylab="Transpiration deficit [mm]",main=sprintf("Transpiration deficit %i",year_plot))
+  lines(beech_sub$doy,beech_sub$tdef,col=col_beech)
+  lines(spruce_sub$doy,spruce_sub$tdef,col=col_spruce)
+  lines(mixed_sub$doy,mixed_sub$tdef,col=col_mixed)
+
+  points(beech_sub$doy[beech_sub$tdef<quantile(na.omit(beech_sub$tdef),0.01)],
+         beech_sub$tdef[beech_sub$tdef<quantile(na.omit(beech_sub$tdef),0.01)],col=col_beech,pch=1)
+  points(spruce_sub$doy[spruce_sub$tdef<quantile(na.omit(spruce_sub$tdef),0.01)],
+         spruce_sub$tdef[spruce_sub$tdef<quantile(na.omit(spruce_sub$tdef),0.01)],col=col_spruce,pch=3)
+  points(mixed_sub$doy[mixed_sub$tdef<quantile(na.omit(mixed_sub$tdef),0.01)],
+         mixed_sub$tdef[mixed_sub$tdef<quantile(na.omit(mixed_sub$tdef),0.01)],col=col_mixed,pch=5)
+  
+  ##plot thresholds
+  abline(h=0.25,col="red",lty=2)
+  abline(h=0.75,col="orange",lty=2)
+  
+  legend("bottomright",legend=c("Beech","Spruce","Mixed"),lwd=2,pch=c(1,3,5),col=cols_treesp)
+  
+}
+
+
+##dygraph
+##rfal and smlt from model results
+Beech=xts(output_beech$tdef[output_beech$yr%in%unique(output_beech$yr)],order.by=output_beech$date[output_beech$yr%in%unique(output_beech$yr)])
+Spruce=xts(output_spruce$tdef[output_spruce$yr%in%unique(output_beech$yr)],order.by=output_spruce$date[output_spruce$yr%in%unique(output_beech$yr)])
+Mixed=xts(mixed$tdef[mixed$yr%in%unique(output_beech$yr)],order.by=mixed$date[mixed$yr%in%unique(output_beech$yr)])
+
+tseries_plot=merge(prec,smlt,Beech,Spruce,Mixed)
+
+##fill missing 15min measurements with closest measurement
+#tseries_smc_filled=na.locf(tseries_plot,fromLast=F,maxgap=10)
+
+##plot
+dygraphs::dygraph(tseries_plot,width=600,height=400) %>%
+  dyAxis("y",label="Transpiration deficit [mm]",valueRange=c(0,10)) %>%
+  dyAxis("y2",label="Net rainfall & snow melt (mixed forest) [mm]",valueRange=c(50,0)) %>%
+  dyGroup(c("Beech","Spruce","Mixed"),drawPoints=F,color=cols_treesp,axis="y") %>%
+  dyLimit(0.25,strokePattern="dashed",color="red") %>%
+  dyLimit(0.75,strokePattern="dashed",color="orange") %>%
+  dyOptions(stackedGraph=F,colors=cols) %>%
+  dyBarSeries('prec',label="Net rainfall [mm/d]",axis="y2") %>% 
+  dyBarSeries('smlt',label="Snow melt [mm/d]",axis="y2") %>%
+  dyRangeSelector(height=20) %>%
+  dyLegend(show="always",width=120)
+
 ```
 
 
@@ -383,38 +672,6 @@ swat_beech=rbindlist(list(`Beech`=res_beech$layer_output),
 Values <Q01 are shown as point markers
 
 ```{r tratio,echo=F,warning=F,error=F,out.width="80%",fig.width=10,fig.height=13}
-
-##re-read outputs
-output_beech=wb_beech
-output_spruce=wb_spruce
-
-col_beech="#ff916e"
-col_spruce="#159837"
-col_mixed="#a387ff"
-cols_treesp=c(col_beech,col_spruce,col_mixed)
-
-##indices beech
-output_beech$tratio=output_beech$tran/output_beech$ptran
-output_beech$tratio[output_beech$tratio>1]=1
-output_beech$tratio[is.nan(output_beech$tratio)]=1
-output_beech$tratio[is.infinite(output_beech$tratio)]=1
-
-##indices spruce
-output_spruce$tratio=output_spruce$tran/output_spruce$ptran
-output_spruce$tratio[output_spruce$tratio>1]=1
-output_spruce$tratio[is.nan(output_spruce$tratio)]=1
-output_spruce$tratio[is.infinite(output_spruce$tratio)]=1
-
-
-##mixed forest (mean of beech and spruce)
-mixed=data.frame(doy=output_beech$doy,
-                 yr=output_beech$yr,
-                 date=output_beech$date,
-                 rnet=apply(cbind(output_beech$rnet,output_spruce$rnet),1,FUN="mean",na.rm=T),
-                 smlt=apply(cbind(output_beech$smlt,output_spruce$smlt),1,FUN="mean",na.rm=T),
-                 tratio=apply(cbind(output_beech$tratio,output_spruce$tratio),1,FUN="mean",na.rm=T)
-)
-
 
 ##plot all years
 par(mfrow=c(6,1),mar=c(2,4,3,1),pty="m")
@@ -425,7 +682,6 @@ for (year_plot in unique(output_beech$yr)){
   mixed_sub=mixed[mixed$yr==year_plot,]
   
   plot(NA,NA,xlim=c(1,366),ylim=c(0,1),xlab="",ylab="Transpiration ratio",main=sprintf("Transpiration ratio %i",year_plot))
-  
   lines(beech_sub$doy,beech_sub$tratio,col=col_beech)
   lines(spruce_sub$doy,spruce_sub$tratio,col=col_spruce)
   lines(mixed_sub$doy,mixed_sub$tratio,col=col_mixed)
@@ -437,12 +693,11 @@ for (year_plot in unique(output_beech$yr)){
   points(mixed_sub$doy[mixed_sub$tratio<quantile(na.omit(mixed_sub$tratio),0.01)],
          mixed_sub$tratio[mixed_sub$tratio<quantile(na.omit(mixed_sub$tratio),0.01)],col=col_mixed,pch=5)
   
-  
   ##plot thresholds
   abline(h=0.25,col="red",lty=2)
   abline(h=0.75,col="orange",lty=2)
   
-  legend("bottomright",legend=c("Beech","Spruce","Mixed"),lwd=2,pch=1:5,col=cols_treesp)
+  legend("bottomright",legend=c("Beech","Spruce","Mixed"),lwd=2,pch=c(1,3,5),col=cols_treesp)
   
 }
 
@@ -452,9 +707,6 @@ for (year_plot in unique(output_beech$yr)){
 Beech=xts(output_beech$tratio[output_beech$yr%in%unique(output_beech$yr)],order.by=output_beech$date[output_beech$yr%in%unique(output_beech$yr)])
 Spruce=xts(output_spruce$tratio[output_spruce$yr%in%unique(output_beech$yr)],order.by=output_spruce$date[output_spruce$yr%in%unique(output_beech$yr)])
 Mixed=xts(mixed$tratio[mixed$yr%in%unique(output_beech$yr)],order.by=mixed$date[mixed$yr%in%unique(output_beech$yr)])
-
-prec=xts(mixed$rnet[mixed$yr%in%unique(output_beech$yr)],order.by=mixed$date[mixed$yr%in%unique(output_beech$yr)])
-smlt=xts(mixed$smlt[mixed$yr%in%unique(output_beech$yr)],order.by=mixed$date[mixed$yr%in%unique(output_beech$yr)])
 
 tseries_plot=merge(prec,smlt,Beech,Spruce,Mixed)
 
@@ -476,175 +728,48 @@ dygraphs::dygraph(tseries_plot,width=600,height=400) %>%
   dyRangeSelector(height=20) %>%
   dyLegend(show="always",width=120)
 
-
 ```
 
 
 ***
-### T_def per DOY
-Values <Q01 are shown as point markers
+### Comparison of drought indicators
 
-```{r tdef,echo=F,warning=F,error=F,out.width="80%",fig.width=10,fig.height=13}
+```{r comp,echo=F,warning=F,error=F}
 
-##indices beech
-output_beech$tdef=output_beech$ptran-output_beech$tran
-output_beech$tdef[output_beech$tdef<0]=0
+par(mfrow=c(3,1),mar=c(4,4,1,1),xaxs="i",yaxs="i")
+xticks=seq(as.Date("2019-01-01"),as.Date("2025-01-01"),by="year")
 
-##indices spruce
-output_spruce$tdef=output_spruce$ptran-output_spruce$tran
-output_spruce$tdef[output_spruce$tdef<0]=0
+plot(NA,NA,xlim=c(as.Date("2019-01-01"),as.Date("2025-01-01")),ylim=c(0,1.5),xlab="",ylab="Relative extractable water",main="Relative extractable water",axes=F)
+axis(side=1,at=xticks,labels=format(xticks,format="%Y"))
+axis(side=2,las=1)
+polygon(x=c(as.Date("2019-01-01"),as.Date("2025-01-01"),as.Date("2025-01-01"),as.Date("2019-01-01"),as.Date("2019-01-01")),
+        y=c(0,0,0.2,0.2,0),border=NA,col="#ff000040")
+polygon(x=c(as.Date("2019-01-01"),as.Date("2025-01-01"),as.Date("2025-01-01"),as.Date("2019-01-01"),as.Date("2019-01-01")),
+        y=c(0.2,0.2,0.4,0.4,0.2),border=NA,col="#ffb20050")
+polygon(x=c(as.Date("2019-01-01"),as.Date("2025-01-01"),as.Date("2025-01-01"),as.Date("2019-01-01"),as.Date("2019-01-01")),
+        y=c(0.4,0.4,1.0,1.0,0.4),border=NA,col="#00aa0040")
+polygon(x=c(as.Date("2019-01-01"),as.Date("2025-01-01"),as.Date("2025-01-01"),as.Date("2019-01-01"),as.Date("2019-01-01")),
+        y=c(1.0,1.0,1.4,1.4,1.0),border=NA,col="#0000aa40")
+lines(output_beech$date,output_beech$relawat,col=col_beech)
+lines(output_spruce$date,output_spruce$relawat,col=col_spruce)
+lines(mixed$date,mixed$relawat,col=col_mixed)
 
+plot(NA,NA,xlim=c(as.Date("2019-01-01"),as.Date("2025-01-01")),ylim=c(0,8),xlab="",ylab="Transpiration deficit [mm]",main="Transpiration deficit",axes=F)
+axis(side=1,at=xticks,labels=format(xticks,format="%Y"))
+axis(side=2,las=1)
+lines(output_beech$date,output_beech$tdef,col=col_beech)
+lines(output_spruce$date,output_spruce$tdef,col=col_spruce)
+lines(mixed_sub$doy,mixed_sub$tdef,col=col_mixed)
 
-##mixed forest (mean of beech and spruce)
-mixed=data.frame(doy=output_beech$doy,
-                 yr=output_beech$yr,
-                 date=output_beech$date,
-                 rnet=apply(cbind(output_beech$rnet,output_spruce$rnet),1,FUN="mean",na.rm=T),
-                 smlt=apply(cbind(output_beech$smlt,output_spruce$smlt),1,FUN="mean",na.rm=T),
-                 tdef=apply(cbind(output_beech$tdef,output_spruce$tdef),1,FUN="mean",na.rm=T)
-)
-
-
-##plot all years
-par(mfrow=c(6,1),mar=c(2,4,3,1),pty="m")
-#year_plot=unique(output_beech$yr)[1]
-for (year_plot in unique(output_beech$yr)){
-  beech_sub=output_beech[output_beech$yr==year_plot,]
-  spruce_sub=output_spruce[output_spruce$yr==year_plot,]
-  mixed_sub=mixed[mixed$yr==year_plot,]
-  
-  plot(NA,NA,xlim=c(1,366),ylim=c(0,8),xlab="",ylab="Transpiration deficit [mm]",main=sprintf("Transpiration deficit %i",year_plot))
-  
-  lines(beech_sub$doy,beech_sub$tdef,col=col_beech)
-  lines(spruce_sub$doy,spruce_sub$tdef,col=col_spruce)
-  lines(mixed_sub$doy,mixed_sub$tdef,col=col_mixed)
-
-  points(beech_sub$doy[beech_sub$tdef<quantile(na.omit(beech_sub$tdef),0.01)],
-         beech_sub$tdef[beech_sub$tdef<quantile(na.omit(beech_sub$tdef),0.01)],col=col_beech,pch=1)
-  points(spruce_sub$doy[spruce_sub$tdef<quantile(na.omit(spruce_sub$tdef),0.01)],
-         spruce_sub$tdef[spruce_sub$tdef<quantile(na.omit(spruce_sub$tdef),0.01)],col=col_spruce,pch=3)
-  points(mixed_sub$doy[mixed_sub$tdef<quantile(na.omit(mixed_sub$tdef),0.01)],
-         mixed_sub$tdef[mixed_sub$tdef<quantile(na.omit(mixed_sub$tdef),0.01)],col=col_mixed,pch=5)
-  
-  
-  ##plot thresholds
-  abline(h=0.25,col="red",lty=2)
-  abline(h=0.75,col="orange",lty=2)
-  
-  legend("bottomright",legend=c("Beech","Spruce","Mixed"),lwd=2,pch=1:5,col=cols_treesp)
-  
-}
-
-
-##dygraph
-##rfal and smlt from model results
-Beech=xts(output_beech$tdef[output_beech$yr%in%unique(output_beech$yr)],order.by=output_beech$date[output_beech$yr%in%unique(output_beech$yr)])
-Spruce=xts(output_spruce$tdef[output_spruce$yr%in%unique(output_beech$yr)],order.by=output_spruce$date[output_spruce$yr%in%unique(output_beech$yr)])
-Mixed=xts(mixed$tdef[mixed$yr%in%unique(output_beech$yr)],order.by=mixed$date[mixed$yr%in%unique(output_beech$yr)])
-
-prec=xts(mixed$rnet[mixed$yr%in%unique(output_beech$yr)],order.by=mixed$date[mixed$yr%in%unique(output_beech$yr)])
-smlt=xts(mixed$smlt[mixed$yr%in%unique(output_beech$yr)],order.by=mixed$date[mixed$yr%in%unique(output_beech$yr)])
-
-tseries_plot=merge(prec,smlt,Beech,Spruce,Mixed)
-
-##fill missing 15min measurements with closest measurement
-#tseries_smc_filled=na.locf(tseries_plot,fromLast=F,maxgap=10)
-
-##plot
-cols=c("#0800ff","#44bbff",cols_treesp)
-par(mar=c(5,5,5,5))
-dygraphs::dygraph(tseries_plot,width=600,height=400) %>%
-  dyAxis("y",label="Transpiration deficit [mm]",valueRange=c(0,10)) %>%
-  dyAxis("y2",label="Net rainfall & snow melt (mixed forest) [mm]",valueRange=c(50,0)) %>%
-  dyGroup(c("Beech","Spruce","Mixed"),drawPoints=F,color=cols_treesp,axis="y") %>%
-  dyLimit(0.25,strokePattern="dashed",color="red") %>%
-  dyLimit(0.75,strokePattern="dashed",color="orange") %>%
-  dyOptions(stackedGraph=F,colors=cols) %>%
-  dyBarSeries('prec',label="Net rainfall [mm/d]",axis="y2") %>% 
-  dyBarSeries('smlt',label="Snow melt [mm/d]",axis="y2") %>%
-  dyRangeSelector(height=20) %>%
-  dyLegend(show="always",width=120)
+plot(NA,NA,xlim=c(as.Date("2019-01-01"),as.Date("2025-01-01")),ylim=c(0,1),xlab="",ylab="Transpiration ratio",main="Transpiration ratio",axes=F)
+axis(side=1,at=xticks,labels=format(xticks,format="%Y"))
+axis(side=2,las=1)
+lines(output_beech$date,output_beech$tratio,col=col_beech)
+lines(output_spruce$date,output_spruce$tratio,col=col_spruce)
+lines(mixed_sub$doy,mixed_sub$tratio,col=col_mixed)
+legend("bottomright",legend=c("Beech","Spruce","Mixed"),lwd=2,col=cols_treesp)
 
 ```
-
-
-***
-### Relative extractable water (REW) per DOY
-Values <Q01 are shown as point markers
-
-```{r rew_plot,echo=F,warning=F,error=F,out.width="80%",fig.width=10,fig.height=13}
-
-mixed_rew=data.frame(doy=output_beech$doy,
-                     yr=output_beech$yr,
-                     date=output_beech$date,
-                     rnet=apply(cbind(output_beech$rnet,output_spruce$rnet),1,FUN="mean",na.rm=T),
-                     smlt=apply(cbind(output_beech$smlt,output_spruce$smlt),1,FUN="mean",na.rm=T),
-                     relawat=apply(cbind(output_beech$relawat,output_spruce$relawat),1,FUN="mean",na.rm=T)
-)
-
-##plot all years
-par(mfrow=c(6,1),mar=c(2,4,3,1),pty="m")
-#year_plot=unique(output_beech$yr)[1]
-for (year_plot in unique(output_beech$yr)){
-  beech_sub=output_beech[output_beech$yr==year_plot,]
-  spruce_sub=output_spruce[output_spruce$yr==year_plot,]
-  mixed_sub=mixed_rew[mixed_rew$yr==year_plot,]
-  
-  plot(NA,NA,xlim=c(1,366),ylim=c(0,2),xlab="",ylab="Relative extractable water",main=sprintf("Relative extractable water %i",year_plot))
-  
-  lines(beech_sub$doy,beech_sub$relawat,col=col_beech)
-  lines(spruce_sub$doy,spruce_sub$relawat,col=col_spruce)
-  lines(mixed_sub$doy,mixed_sub$relawat,col=col_mixed)
-
-  points(beech_sub$doy[beech_sub$relawat<quantile(na.omit(beech_sub$relawat),0.01)],
-         beech_sub$relawat[beech_sub$relawat<quantile(na.omit(beech_sub$relawat),0.01)],col=col_beech,pch=1)
-  points(spruce_sub$doy[spruce_sub$relawat<quantile(na.omit(spruce_sub$relawat),0.01)],
-         spruce_sub$relawat[spruce_sub$relawat<quantile(na.omit(spruce_sub$relawat),0.01)],col=col_spruce,pch=3)
-  points(mixed_sub$doy[mixed_sub$relawat<quantile(na.omit(mixed_sub$relawat),0.01)],
-         mixed_sub$relawat[mixed_sub$relawat<quantile(na.omit(mixed_sub$relawat),0.01)],col=col_mixed,pch=5)
-  
-  
-  ##plot thresholds
-  abline(h=0.2,col="red",lty=2)
-  abline(h=0.4,col="orange",lty=2)
-  abline(h=1,col="green",lty=2)
-  
-  legend("topright",legend=c("Beech","Spruce","Mixed"),lwd=2,pch=1:5,col=cols_treesp)
-  
-}
-
-
-
-##dygraph
-##rfal and smlt from model results
-Beech=xts(output_beech$relawat[output_beech$yr%in%unique(output_beech$yr)],order.by=output_beech$date[output_beech$yr%in%unique(output_beech$yr)])
-Spruce=xts(output_spruce$relawat[output_spruce$yr%in%unique(output_beech$yr)],order.by=output_spruce$date[output_spruce$yr%in%unique(output_beech$yr)])
-Mixed=xts(mixed_rew$relawat[mixed_rew$yr%in%unique(output_beech$yr)],order.by=mixed_rew$date[mixed_rew$yr%in%unique(output_beech$yr)])
-
-prec=xts(mixed_rew$rnet[mixed_rew$yr%in%unique(output_beech$yr)],order.by=mixed_rew$date[mixed_rew$yr%in%unique(output_beech$yr)])
-smlt=xts(mixed_rew$smlt[mixed_rew$yr%in%unique(output_beech$yr)],order.by=mixed_rew$date[mixed_rew$yr%in%unique(output_beech$yr)])
-
-tseries_plot=merge(prec,smlt,Beech,Spruce,Mixed)
-
-##fill missing 15min measurements with closest measurement
-#tseries_smc_filled=na.locf(tseries_plot,fromLast=F,maxgap=10)
-
-dygraphs::dygraph(tseries_plot,width=600,height=400) %>%
-  dyAxis("y",label="Relative extractable water (REW)",valueRange=c(0,2)) %>%
-  dyAxis("y2",label="Net rainfall & snow melt (mixed forest) [mm]",valueRange=c(50,0)) %>%
-  dyGroup(c("Beech","Spruce","Mixed"),drawPoints=F,color=cols_treesp,axis="y") %>%
-  dyLimit(0.2,strokePattern="dashed",color="red") %>%
-  dyLimit(0.4,strokePattern="dashed",color="orange") %>%
-  dyLimit(1,strokePattern="dashed",color="green") %>%
-  dyOptions(stackedGraph=F,colors=cols) %>%
-  dyBarSeries('prec',label="Net rainfall [mm/d]",axis="y2") %>% 
-  dyBarSeries('smlt',label="Snow melt [mm/d]",axis="y2") %>%
-  dyRangeSelector(height=20) %>%
-  dyLegend(show="always",width=120)
-
-
-```
-
 
 ***
 ### Water balance: Mean monthly conditions
