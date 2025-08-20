@@ -1,0 +1,287 @@
+---
+title: "Landsat imagery"
+author: "Thomas Zieher"
+date: "2025-08-20"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r header,include=T}
+#####################################################
+##                                                 ##
+##      ######      #########  ##          ##      ##
+##      #######     ########   ##          ##      ##
+##      ##    ##    ##         ##          ##      ##
+##      ##   ##     ##         ##          ##      ##
+##      ######      ######     ##          ##      ##
+##      #######     #####      ##          ##      ##
+##      ##    ##    ##         ##    ##    ##      ##
+##      ##     ##   ##         ##   ####   ##      ##
+##      ##     ##   ##         ##  ##  ##  ##      ##
+##      ########    ##          ####    ####       ##
+##      #######     ##           ##      ##        ##
+##                                                 ##
+#####################################################
+##                                                 ##
+##  Author: Thomas Zieher                          ##
+##  Institute: Nat Haz, 6.3                        ##
+##  Date: 2025-08-20                               ##
+##  License: GNU GPL V.3 or later                  ##
+##                                                 ##
+#####################################################
+##  Description: Processing of MPC landsat imagery for derivation of indices maps and time series analyses
+##  Environment: renv
+#####################################################
+
+##set include=F to omit header in output
+
+```
+
+
+```{r setup,include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+##empty environment
+rm(list=ls())
+
+##install package renv
+#install.packages("renv")
+
+##install packages with respective version
+renv::snapshot()
+renv::restore()
+
+##devtools::install_github("e-sensing/sits")
+library(sits)
+library(rstac)
+library(sf)
+library(rstudioapi)
+library(aqp)
+proj_path=dirname(rstudioapi::getActiveProject())
+
+##set paths
+root=paste(proj_path,"earth_sensing_summer_school",sep="/")
+soil_path=paste(root,"data/soilgrids",sep="/")
+model_path=paste(root,"data/lwf_brook90",sep="/")
+
+##local paths
+sits_path_img="D:/sits_output/imagery"
+sits_path_reg="D:/sits_output/regularized"
+
+
+##read soil data
+soilgrid_profiles=readRDS(paste(soil_path,"soilgrids_profiles.rds",sep="/"))
+##get sites
+sites_raw=aqp::site(soilgrid_profiles)
+sites_wgs84=sf::st_as_sf(sites_raw)
+
+
+##check available data on MPC: https://planetarycomputer.microsoft.com/dataset/landsat-c2-l2
+sits_list_collections("MPC")
+
+##MPC STAC endpoint
+stac_url="https://planetarycomputer.microsoft.com/api/stac/v1"
+
+##set period, aoi, crs and spatial resolution
+start_date="2019-01-01"
+end_date="2024-12-31"
+crs_def="32633" #UTM 33N
+left=282000 #m
+right=289000 #m
+bottom=5145000 #m
+top=5152000 #m
+spat_res=30 #m
+temp_res="P1M" ##monthly
+
+##create aoi sf
+aoi=sf::st_as_sf(sf::st_sfc(sf::st_polygon(x=list(matrix(c(left,bottom,left,top,right,top,right,bottom,left,bottom),ncol=2,byrow=T))),
+                            crs=sprintf("EPSG:%s",crs_def)))
+aoi_wgs84=sf::st_transform(aoi,crs="EPSG:4326")
+
+```
+
+
+***
+### Build a cube with landsat-c2-l2 data
+A local copy of the cube is produced, this can take long...
+
+```{r ls_cube,echo=F,warning=F,error=F}
+
+# landsat_mpc=sits::sits_cube(source="MPC",
+#                             collection="LANDSAT-C2-L2",
+#                             bands=c("BLUE","GREEN","RED","NIR08","SWIR16","SWIR22","CLOUD"),
+#                             roi=aoi_wgs84,
+#                             start_date=start_date,
+#                             end_date=end_date,
+#                             progress=F
+#                             )
+# 
+# #quick visualization
+# #plot(landsat_mpc)
+# 
+# ##copy locally
+# cube_local=sits::sits_cube_copy(landsat_mpc,
+#                                 roi=aoi_wgs84,
+#                                 output_dir=sits_path_img,
+#                                 progress=F
+#                                 )
+
+##create a cube from local files
+data_dir=system.file(sits_path,package="sits")
+cube_local=sits::sits_cube(source="MPC",
+                           collection="LANDSAT-C2-L2",
+                           satellite="LANDSAT",
+                           sensor="TM-ETM-OLI",
+                           data_dir=sits_path_img,
+                           progress=F
+                           )
+
+##check timeline
+sits_timeline(cube_local)
+
+##regularize (takes long)
+cube_local_tl=cube_local[cube_local$tile==cube_local$tile[which.max(sapply(cube_local$file_info, nrow))],]
+landsat_reg=sits::sits_regularize(cube=cube_local_tl,
+                                  period=temp_res,
+                                  res=spat_res,
+                                  multicores=4,
+                                  output_dir=sits_path_reg
+                                  )
+
+##check rgb
+plot(landsat_reg,red="RED",green="GREEN",blue="BLUE")
+
+##calculate ndvi
+##NDVI=(N-R)/(N+R)
+ndvi_cube=sits::sits_apply(data=landsat_reg,
+                           NDVI=(NIR08-RED)/(NIR08+RED),
+                           output_dir=tempdir(),
+                           multicores=4,
+                           progress=F
+                           )
+
+
+##calculate savi
+##SAVI=(1.0+L)*(N-R)/(N+R+L)
+##L=0.19
+savi_cube=sits::sits_apply(data=landsat_reg,
+                           SAVI=(1+0.19)*(NIR08-RED)/(NIR08+RED+0.19),
+                           output_dir=tempdir(),
+                           multicores=4,
+                           progress=F
+                           )
+
+
+##calculate evi
+##EVI=g*(N-R)/(N+C1*R-C2*B+L)
+##coefficients g, C1, C2, L: https://kaflekrishna.com.np/blog-detail/enhanced-vegetation-index-evi-sentinel-2-image-google-earth-engine/
+evi_cube=sits::sits_apply(data=landsat_reg,
+                          EVI=2.5*(NIR08-RED)/(NIR08+6.0*RED-7.5*BLUE+1),
+                          output_dir=tempdir(),
+                          multicores=4,
+                          progress=F
+                          )
+
+```
+
+
+***
+## Extract time series
+
+```{r ls_ts,echo=F,warning=F,error=F}
+
+##prepare points
+sites_wgs84["label"]=sites_wgs84$id
+ts_points_ndvi=sits::sits_get_data(cube=ndvi_cube,samples=sites_wgs84)
+ts_points_savi=sits::sits_get_data(cube=savi_cube,samples=sites_wgs84)
+ts_points_evi=sits::sits_get_data(cube=evi_cube,samples=sites_wgs84)
+
+##inspect
+print(ts_points_ndvi)
+
+##plot NDVI time series
+plot(NA,NA,xlim=c(as.POSIXct(start_date),as.POSIXct(end_date)),ylim=c(0,1),xlab="",ylab="NDVI",axes=F)
+xticks=seq(as.POSIXct(start_date),as.POSIXct(end_date)+60*60*24*365,by="6 months")
+axis(side=1,at=xticks,labels=format(xticks,format="%Y-%m"))
+axis(side=2,las=1)
+
+for (i in 1:nrow(ts_points_ndvi)){
+  ndvi_series=ts_points_ndvi$time_series[[i]]
+  lines(as.POSIXct(ndvi_series$Index),ndvi_series$NDVI,type="o")
+}
+
+
+##plot SAVI time series
+plot(NA,NA,xlim=c(as.POSIXct(start_date),as.POSIXct(end_date)),ylim=c(0,1),xlab="",ylab="SAVI",axes=F)
+axis(side=1,at=xticks,labels=format(xticks,format="%Y-%m"))
+axis(side=2,las=1)
+
+for (i in 1:nrow(ts_points_savi)){
+  savi_series=ts_points_savi$time_series[[i]]
+  lines(as.POSIXct(savi_series$Index),savi_series$SAVI,type="o")
+}
+
+
+
+##plot EVI time series
+plot(NA,NA,xlim=c(as.POSIXct(start_date),as.POSIXct(end_date)),ylim=c(0,1),xlab="",ylab="EVI",axes=F)
+axis(side=1,at=xticks,labels=format(xticks,format="%Y-%m"))
+axis(side=2,las=1)
+
+for (i in 1:nrow(ts_points_evi)){
+  evi_series=ts_points_evi$time_series[[i]]
+  lines(as.POSIXct(evi_series$Index),evi_series$EVI,type="o")
+}
+
+
+```
+
+
+***
+### Compare with model results
+This may or may not work...
+
+```{r comp,echo=F,warning=F,error=F}
+
+##read model results
+pid="P3"#"P1"
+mod_res=read.table(paste(model_path,sprintf("wb_indices_%s.csv",pid),sep="/"),header=T,sep=";")
+mod_res$date=as.POSIXct(mod_res$date,tz="UTC")
+
+
+##prepare model results with landsat indices
+ndvi_series=ts_points_ndvi$time_series[ts_points_ndvi$label==pid][[1]]
+savi_series=ts_points_savi$time_series[ts_points_savi$label==pid][[1]]
+evi_series=ts_points_evi$time_series[ts_points_evi$label==pid][[1]]
+
+plot(mod_res$date,mod_res$relawat,type="l",xlab="",ylab="Relawat")
+par(new=T)
+plot(as.POSIXct(ndvi_series$Index),ndvi_series$NDVI,type="o",pch=20,lwd=2,col="red",axes=F,xlab="",ylab="")
+lines(as.POSIXct(savi_series$Index),savi_series$SAVI,type="o",pch=20,lwd=2,col="steelblue")
+lines(as.POSIXct(evi_series$Index),evi_series$EVI,type="o",pch=20,lwd=2,col="darkgreen")
+
+axis(side=4)
+mtext(side=4,"Indices",line=3)
+legend("bottomright",legend=c("NDVI","SAVI","EVI"),pch=20,lwd=2,col=c("red","steelblue","darkgreen"))
+
+
+
+##compare annual variation
+ndvi_series["year"]=format(ndvi_series$Index,format="%Y")
+savi_series["year"]=format(savi_series$Index,format="%Y")
+evi_series["year"]=format(evi_series$Index,format="%Y")
+mod_res$year=format(mod_res$date,format="%Y")
+
+boxplot(ndvi_series$NDVI~ndvi_series$year,xlab="",ylab="NDVI")
+boxplot(savi_series$SAVI~savi_series$year,xlab="",ylab="SAVI")
+boxplot(evi_series$EVI~evi_series$year,xlab="",ylab="EVI")
+
+boxplot(mod_res$relawat~mod_res$year,xlab="",ylab="Relawat")
+boxplot(mod_res$tdef~mod_res$year,xlab="",ylab="Tdef")
+boxplot(mod_res$tratio~mod_res$year,xlab="",ylab="Tratio")
+
+
+##We need to refine the model parameterization first!
+
+```

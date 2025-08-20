@@ -1,5 +1,5 @@
 ---
-title: "Process datacube"
+title: "Sentinel-2 imagery"
 author: "Thomas Zieher"
 date: "2025-06-04"
 output: html_document
@@ -84,7 +84,9 @@ sites=sf::st_transform(sites_wgs84,"EPSG:32633")
 
 
 
-##set crs, aoi and spatial resolution
+##set period, aoi, crs and spatial resolution
+start_date="2019-01-01"
+end_date="2024-12-31"
 crs_def="32633" #UTM 33N
 left=282000 #m
 right=289000 #m
@@ -411,11 +413,25 @@ m=cor(ts_single_clean[,c("evi","fcvi","ireci","msavi","msi","ndmi","ndrei","nirv
 corrplot(m,type="lower",col=brewer.pal(n=8, name="RdYlBu"))
 
 
+##annual variation
+ts_single_clean["year"]=format(ts_single_clean$date,format="%Y")
+boxplot(ts_single_clean$ndvi~ts_single_clean$year,xlab="",ylab="NDVI")
+boxplot(ts_single_clean$savi~ts_single_clean$year,xlab="",ylab="SAVI")
+boxplot(ts_single_clean$evi~ts_single_clean$year,xlab="",ylab="EVI")
+
+
+##monthly variation
+ts_single_clean["month"]=format(ts_single_clean$date,format="%m")
+boxplot(ts_single_clean$ndvi~ts_single_clean$month,xlab="",ylab="NDVI")
+boxplot(ts_single_clean$savi~ts_single_clean$month,xlab="",ylab="SAVI")
+boxplot(ts_single_clean$evi~ts_single_clean$month,xlab="",ylab="EVI")
+
 ```
 
 
 ***
 ### Compare with model results
+This may or may not work...
 
 ```{r comp,echo=F,warning=F,error=F}
 
@@ -423,10 +439,22 @@ corrplot(m,type="lower",col=brewer.pal(n=8, name="RdYlBu"))
 mod_res=read.table(paste(model_path,sprintf("wb_indices_%s.csv",pid),sep="/"),header=T,sep=";")
 mod_res$date=as.POSIXct(mod_res$date,tz="UTC")
 
-plot(mod_res$date,mod_res$relawat,type="l",xlab="",ylab="Relawat")
+plot(mod_res$date,mod_res$relawat,type="l",xlab="",ylab="Relawat",axes=F)
+xticks=seq(as.POSIXct(start_date),as.POSIXct(end_date)+60*60*24*365,by="6 months")
+axis(side=1,at=xticks,labels=format(xticks,format="%Y-%m"))
+axis(side=2)
+
 par(new=T)
-plot(ts_single_clean$date,ts_single_clean$evi,type="o",pch=20,col="red",axes=F,xlab="",ylab="")
-mtext(side=4,"NDVI",line=3)
+plot(ts_single_clean$date,ts_single_clean$ndvi,type="o",ylim=c(-0.3,1.3),pch=20,lwd=2,col="red",axes=F,xlab="",ylab="")
+lines(ts_single_clean$date,ts_single_clean$savi,type="o",pch=20,lwd=2,col="steelblue")
+lines(ts_single_clean$date,ts_single_clean$evi,type="o",pch=20,lwd=2,col="darkgreen")
+lines(ts_single_clean$date,ts_single_clean$ireci,type="o",pch=20,lwd=2,col="orange")
+lines(ts_single_clean$date,ts_single_clean$ndrei,type="o",pch=20,lwd=2,col="black")
+
+axis(side=4)
+mtext(side=4,"Indices",line=3)
+legend("bottomright",legend=c("NDVI","SAVI","EVI","IRECI","NDREI"),pch=20,lwd=2,col=c("red","steelblue","darkgreen","orange","black"))
+
 
 
 ##We need to refine the model parameterization first!
