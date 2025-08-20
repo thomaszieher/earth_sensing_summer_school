@@ -64,7 +64,7 @@ https://www.isprs.org/documents/orangebook/app5.aspx
 
 The methods and content of this assignment were elaborated within the WINALP-21 project, funded by the INTERREG VI-A program (grant number BA0100020).
 
-[<img src="https://github.com/thomaszieher/earth_sensing_summer_school/blob/main/plots/project_logo.jpg" width="600" />](https://github.com/thomaszieher/earth_sensing_summer_school/blob/main/plots/project_logo.jpg)  
+[<img src="https://github.com/thomaszieher/earth_sensing_summer_school/blob/main/plots/project_logo.png" width="600" />](https://github.com/thomaszieher/earth_sensing_summer_school/blob/main/plots/project_logo.png)  
 
 <h2>References</h2>
 
