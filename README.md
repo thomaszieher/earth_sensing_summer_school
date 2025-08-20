@@ -60,6 +60,12 @@ https://www.isprs.org/documents/orangebook/app5.aspx
 4. Clone repository: https://github.com/thomaszieher/earth_sensing_summer_school.git  
 5. Restore environment with ```renv::restore()```
 
+<h2>Acknowledgements</h2>
+
+The methods and content of this assignment were elaborated within the WINALP-21 project, funded by the INTERREG VI-A program (grant number BA0100020).
+
+[<img src="https://github.com/thomaszieher/earth_sensing_summer_school/blob/main/plots/project_logo.jpg" width="600" />](https://github.com/thomaszieher/earth_sensing_summer_school/blob/main/plots/project_logo.jpg)  
+
 <h2>References</h2>
 
 EC & JRC, 2022. Drought in northern Italy March 2022 – GDO analytical report, Publications Office of the European Union.  
