@@ -60,6 +60,7 @@ library(xts)
 library(dygraphs)
 library(ggplot2)
 library(climatol)
+library(aqp)
 library(rstudioapi)
 
 
@@ -75,6 +76,9 @@ soil_path=paste(root,"data/soilgrids",sep="/")
 ##set period
 start_date=as.Date("2019-01-01")
 end_date=as.Date("2024-12-31")
+
+##select pid
+pid="P1"#"P2"#"P3"#"P4"#
 
 
 ##plot soil profile
@@ -214,8 +218,10 @@ sites=aqp::site(soilgrid_profiles)
 profiles=aqp::horizons(soilgrid_profiles)
 
 ##get single location
-pid="P3"#"P1"#"P2"#
 location=sites[sites$id==pid,]
+
+
+##take soilgrids profile
 soil=profiles[profiles$id==pid,]
 
 ##modifications for LWF-Brook90
@@ -227,7 +233,7 @@ soilplot(soil)
 
 
 
-# ##individual soil parameterization
+# ##or use individual soil parameterization
 # nlayers=6 ##number of mineral soil layers
 # max_depth=-0.5#-0.2##-1##
 # soil_raw=data.table()
@@ -254,7 +260,7 @@ soilplot(soil)
 # 
 # ##add humus layer
 # hum_depth=-0.1 #m
-# hum_layer=data.table(lower=hum_depth,hor_num=0,gravel=NA,corg=NA,topsoil=NA,bd=NA,upper=0,dw=NA,clay=NA,silt=NA,sand=NA,
+# hum_layer=data.table(lower=hum_depth,hor_num=0,gravel=0,corg=0,topsoil=0,bd=0,upper=0,dw=0,clay=0,silt=0,sand=0,
 #                      LWFBrook90R::hydpar_ff_b90())
 # soil_loc$upper=seq(0,(max_depth-(soil_raw$lower/nlayers)),length.out=nlayers)+hum_depth
 # soil_loc$lower=c(soil_loc$upper[2:nrow(soil_loc)],max_depth+hum_depth)
@@ -512,13 +518,13 @@ swat_spruce[,dates:=as.POSIXct(paste(yr,mo,da,sep="-"),tz="UTC")]
 swat_beech[,dates:=as.POSIXct(paste(yr,mo,da,sep="-"),tz="UTC")]
 
 ##get theta at topmost soil layer
-swat_spruce_nl1=swat_spruce[which(nl==1),list(theta=mean(theta)),by=dates]
-swat_beech_nl1=swat_beech[which(nl==1),list(theta=mean(theta)),by=dates]
+swat_spruce_nl=swat_spruce[which(nl==2),list(theta=mean(theta)),by=dates]
+swat_beech_nl=swat_beech[which(nl==2),list(theta=mean(theta)),by=dates]
 
 ##compare
-ts_swat_spruce_nl1=xts(swat_spruce_nl1$theta*100,order.by=swat_spruce_nl1$dates)
-ts_swat_beech_nl1=xts(swat_beech_nl1$theta*100,order.by=swat_beech_nl1$dates)
-tseries_plot_5cm=merge(prec,smlt,ts_swat_beech_nl1,ts_swat_spruce_nl1)
+ts_swat_spruce_nl=xts(swat_spruce_nl$theta*100,order.by=swat_spruce_nl$dates)
+ts_swat_beech_nl=xts(swat_beech_nl$theta*100,order.by=swat_beech_nl$dates)
+tseries_plot_nl=merge(prec,smlt,ts_swat_beech_nl,ts_swat_spruce_nl)
 
 ##fill missing 15min measurements with closest measurement
 #tseries_smc_filled=na.locf(tseries_plot,fromLast=F,maxgap=10)
@@ -526,14 +532,14 @@ tseries_plot_5cm=merge(prec,smlt,ts_swat_beech_nl1,ts_swat_spruce_nl1)
 ##plot
 cols_prec=c("#F39200","#86E29E","#0800ff","#50ffff")
 par(mar=c(5,5,5,5))
-dygraph(tseries_plot_5cm,width="auto",height=400) %>%
+dygraph(tseries_plot_nl,width="auto",height=400) %>%
   dyAxis("y",label="Soil moisture content [%]",valueRange=c(20,60)) %>%
   dyAxis("y2",label="Precipitation [mm/d]",valueRange=c(50,0)) %>%
   dyBarSeries('prec',label="Rainfall [mm/d]",axis="y2") %>%  
   dyBarSeries('smlt',label="Snow melt [mm/d]",axis="y2") %>% 
   dyOptions(stackedGraph=T,colors=cols_prec) %>%
-  dySeries('ts_swat_beech_nl1',label="SMC beech nl1 [%]",axis="y") %>%
-  dySeries('ts_swat_spruce_nl1',label="SMC spruce nl1 [%]",axis="y") %>%
+  dySeries('ts_swat_beech_nl',label="SMC beech nl [%]",axis="y") %>%
+  dySeries('ts_swat_spruce_nl',label="SMC spruce nl [%]",axis="y") %>%
   dyRangeSelector(height=20) %>%
   dyOptions(stackedGraph=F,colors=cols_prec) %>%
   dyLegend()
@@ -771,6 +777,7 @@ legend("bottomright",legend=c("Beech","Spruce","Mixed"),lwd=2,col=cols_treesp)
 
 ```
 
+
 ***
 ### Water balance: Mean monthly conditions
 
@@ -870,7 +877,8 @@ print(p_budg)
 
 ```{r write,echo=F,warning=F,error=F}
 
-write.table(output_beech[,c("date","tratio","tdef","relawat")],paste(model_path,sprintf("wb_indices_%s.csv",pid),sep="/"),sep=";",quote=F,row.names=F)
+write.table(output_beech[,c("date","tratio","tdef","relawat")],paste(model_path,sprintf("wb_indices_%s_beech.csv",pid),sep="/"),sep=";",quote=F,row.names=F)
+write.table(output_spruce[,c("date","tratio","tdef","relawat")],paste(model_path,sprintf("wb_indices_%s_spruce.csv",pid),sep="/"),sep=";",quote=F,row.names=F)
 
 ```
 

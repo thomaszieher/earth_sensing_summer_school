@@ -65,7 +65,7 @@ root=paste(proj_path,"earth_sensing_summer_school",sep="/")
 soil_path=paste(root,"data/soilgrids",sep="/")
 model_path=paste(root,"data/lwf_brook90",sep="/")
 
-##local paths
+##set local paths
 sits_path_img="D:/sits_output/imagery"
 sits_path_reg="D:/sits_output/regularized"
 
@@ -99,6 +99,12 @@ aoi=sf::st_as_sf(sf::st_sfc(sf::st_polygon(x=list(matrix(c(left,bottom,left,top,
                             crs=sprintf("EPSG:%s",crs_def)))
 aoi_wgs84=sf::st_transform(aoi,crs="EPSG:4326")
 
+
+##set tree species of model results
+tree_species="spruce"#"beech"#
+##select pid
+pid="P4"#"P3"#"P2"#"P1"
+
 ```
 
 
@@ -126,28 +132,38 @@ A local copy of the cube is produced, this can take long...
 #                                 output_dir=sits_path_img,
 #                                 progress=F
 #                                 )
+# 
+# ##create a cube from local files
+# cube_local=sits::sits_cube(source="MPC",
+#                            collection="LANDSAT-C2-L2",
+#                            satellite="LANDSAT",
+#                            sensor="TM-ETM-OLI",
+#                            data_dir=sits_path_img,
+#                            progress=F
+#                            )
+# 
+# ##check timeline
+# #sits_timeline(cube_local)
+# 
+# ##regularize (takes long)
+# cube_local_tl=cube_local[cube_local$tile==cube_local$tile[which.max(sapply(cube_local$file_info, nrow))],]
+# landsat_reg=sits::sits_regularize(cube=cube_local_tl,
+#                                   period=temp_res,
+#                                   res=spat_res,
+#                                   multicores=4,
+#                                   output_dir=sits_path_reg,
+#                                   progress=F
+#                                   )
+
 
 ##create a cube from local files
-data_dir=system.file(sits_path,package="sits")
-cube_local=sits::sits_cube(source="MPC",
+landsat_reg=sits::sits_cube(source="MPC",
                            collection="LANDSAT-C2-L2",
                            satellite="LANDSAT",
                            sensor="TM-ETM-OLI",
-                           data_dir=sits_path_img,
+                           data_dir=sits_path_reg,
                            progress=F
                            )
-
-##check timeline
-sits_timeline(cube_local)
-
-##regularize (takes long)
-cube_local_tl=cube_local[cube_local$tile==cube_local$tile[which.max(sapply(cube_local$file_info, nrow))],]
-landsat_reg=sits::sits_regularize(cube=cube_local_tl,
-                                  period=temp_res,
-                                  res=spat_res,
-                                  multicores=4,
-                                  output_dir=sits_path_reg
-                                  )
 
 ##check rgb
 plot(landsat_reg,red="RED",green="GREEN",blue="BLUE")
@@ -240,13 +256,11 @@ for (i in 1:nrow(ts_points_evi)){
 
 ***
 ### Compare with model results
-This may or may not work...
 
 ```{r comp,echo=F,warning=F,error=F}
 
 ##read model results
-pid="P3"#"P1"
-mod_res=read.table(paste(model_path,sprintf("wb_indices_%s.csv",pid),sep="/"),header=T,sep=";")
+mod_res=read.table(paste(model_path,sprintf("wb_indices_%s_%s.csv",pid,tree_species),sep="/"),header=T,sep=";")
 mod_res$date=as.POSIXct(mod_res$date,tz="UTC")
 
 
@@ -268,10 +282,10 @@ legend("bottomright",legend=c("NDVI","SAVI","EVI"),pch=20,lwd=2,col=c("red","ste
 
 
 ##compare annual variation
+mod_res$year=format(mod_res$date,format="%Y")
 ndvi_series["year"]=format(ndvi_series$Index,format="%Y")
 savi_series["year"]=format(savi_series$Index,format="%Y")
 evi_series["year"]=format(evi_series$Index,format="%Y")
-mod_res$year=format(mod_res$date,format="%Y")
 
 boxplot(ndvi_series$NDVI~ndvi_series$year,xlab="",ylab="NDVI")
 boxplot(savi_series$SAVI~savi_series$year,xlab="",ylab="SAVI")
@@ -280,6 +294,22 @@ boxplot(evi_series$EVI~evi_series$year,xlab="",ylab="EVI")
 boxplot(mod_res$relawat~mod_res$year,xlab="",ylab="Relawat")
 boxplot(mod_res$tdef~mod_res$year,xlab="",ylab="Tdef")
 boxplot(mod_res$tratio~mod_res$year,xlab="",ylab="Tratio")
+
+
+
+##monthly variation
+mod_res$month=format(mod_res$date,format="%m")
+ndvi_series["month"]=format(ndvi_series$Index,format="%m")
+savi_series["month"]=format(savi_series$Index,format="%m")
+evi_series["month"]=format(evi_series$Index,format="%m")
+
+boxplot(ndvi_series$NDVI~ndvi_series$month,xlab="",ylab="NDVI")
+boxplot(savi_series$SAVI~savi_series$month,xlab="",ylab="SAVI")
+boxplot(evi_series$EVI~evi_series$month,xlab="",ylab="EVI")
+
+boxplot(mod_res$relawat~mod_res$month,xlab="",ylab="Relawat")
+boxplot(mod_res$tdef~mod_res$month,xlab="",ylab="Tdef")
+boxplot(mod_res$tratio~mod_res$month,xlab="",ylab="Tratio")
 
 
 ##We need to refine the model parameterization first!

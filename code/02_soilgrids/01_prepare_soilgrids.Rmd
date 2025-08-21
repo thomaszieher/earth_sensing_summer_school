@@ -77,11 +77,11 @@ soilgrids_path=paste(root,"data/soilgrids",sep="/")
 
 ```{r poi,echo=T,warning=F,error=F}
 
-sites=data.frame(id=c("P1","P2","P3"),
-                 lon=c(12.215,12.1797,12.2125),
-                 lat=c(46.449,46.4465,46.4685),
-                 aspect=c(290,40,210),
-                 slope=c(25,30,30)
+sites=data.frame(id=c("P1","P2","P3","P4"),
+                 lon=c(12.215,12.1797,12.2125,12.1948),
+                 lat=c(46.449,46.4465,46.4685,46.4559),
+                 aspect=c(290,40,210,80),
+                 slope=c(25,30,30,25)
 )
 
 ```

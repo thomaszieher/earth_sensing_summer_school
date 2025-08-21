@@ -58,10 +58,10 @@ library(dplyr)
 library(terra)
 library(sf)
 library(ncdf4)
-library(rstudioapi)
 library(corrplot)
 library(RColorBrewer)
 library(aqp)
+library(rstudioapi)
 proj_path=dirname(rstudioapi::getActiveProject())
 
 ##set paths
@@ -71,7 +71,7 @@ model_path=paste(root,"data/lwf_brook90",sep="/")
 
 
 ##downloaded L2A-data with less than 30% cloud cover
-s2_path="E:/summer_school_2025/S2"
+s2_path="E:/s2_scenes"
 outpath="E:/summer_school_2025"
 
 
@@ -82,6 +82,11 @@ sites_raw=aqp::site(soilgrid_profiles)
 sites_wgs84=sf::st_as_sf(sites_raw)
 sites=sf::st_transform(sites_wgs84,"EPSG:32633")
 
+
+##set tree species of model results
+tree_species="spruce"#"beech"#
+##select pid
+pid="P4"#"P3"#"P2"#"P1"
 
 
 ##set period, aoi, crs and spatial resolution
@@ -164,7 +169,7 @@ points(sf::st_geometry(sites),pch=20,col="red")
 # 
 # ##export gdalcube as netcdf
 # #bands_cube=gdalcubes::raster_cube(s2_coll,v_subarea)
-# #gdalcubes::write_ncdf(bands_cube,paste(outpath,"e3s_bands_cube.nc",sep="/"),pack=T,overwrite=T)
+# #gdalcubes::write_ncdf(bands_cube,paste(outpath,"s2_bands_cube.nc",sep="/"),pack=T,overwrite=T)
 
 ```
 
@@ -175,7 +180,7 @@ points(sf::st_geometry(sites),pch=20,col="red")
 ```{r netcdf,echo=F,warning=F,error=F}
 
 ##read s2 bands
-nc_in=nc_open(paste(outpath,"e3s_bands_cube.nc",sep="/"))
+nc_in=nc_open(paste(outpath,"s2_bands_cube.nc",sep="/"))
 
 ##create formatted dates from netcdf infos
 ntstep=nc_in$dim[["time"]]$len
@@ -273,7 +278,6 @@ points(sf::st_geometry(sites),pch=20,col="red")
 ```{r ts,echo=F,warning=F,error=F}
 
 ##extract band time series
-pid="P3"#"P1"
 location=sites[sites$id==pid,]
 
 ts_single=data.frame(date=dates)
@@ -410,33 +414,18 @@ lines(ts_single_clean$date,ts_single_clean$ndvi,type="l")
 
 ##check correlation
 m=cor(ts_single_clean[,c("evi","fcvi","ireci","msavi","msi","ndmi","ndrei","nirv","nmdi","rendvi","s2rep","savi","gndvi","gvmi","ndvi")])
-corrplot(m,type="lower",col=brewer.pal(n=8, name="RdYlBu"))
-
-
-##annual variation
-ts_single_clean["year"]=format(ts_single_clean$date,format="%Y")
-boxplot(ts_single_clean$ndvi~ts_single_clean$year,xlab="",ylab="NDVI")
-boxplot(ts_single_clean$savi~ts_single_clean$year,xlab="",ylab="SAVI")
-boxplot(ts_single_clean$evi~ts_single_clean$year,xlab="",ylab="EVI")
-
-
-##monthly variation
-ts_single_clean["month"]=format(ts_single_clean$date,format="%m")
-boxplot(ts_single_clean$ndvi~ts_single_clean$month,xlab="",ylab="NDVI")
-boxplot(ts_single_clean$savi~ts_single_clean$month,xlab="",ylab="SAVI")
-boxplot(ts_single_clean$evi~ts_single_clean$month,xlab="",ylab="EVI")
+corrplot(m,type="lower",col=brewer.pal(n=8,name="RdYlBu"))
 
 ```
 
 
 ***
 ### Compare with model results
-This may or may not work...
 
 ```{r comp,echo=F,warning=F,error=F}
 
 ##read model results
-mod_res=read.table(paste(model_path,sprintf("wb_indices_%s.csv",pid),sep="/"),header=T,sep=";")
+mod_res=read.table(paste(model_path,sprintf("wb_indices_%s_%s.csv",pid,tree_species),sep="/"),header=T,sep=";")
 mod_res$date=as.POSIXct(mod_res$date,tz="UTC")
 
 plot(mod_res$date,mod_res$relawat,type="l",xlab="",ylab="Relawat",axes=F)
@@ -456,8 +445,41 @@ mtext(side=4,"Indices",line=3)
 legend("bottomright",legend=c("NDVI","SAVI","EVI","IRECI","NDREI"),pch=20,lwd=2,col=c("red","steelblue","darkgreen","orange","black"))
 
 
+##compare annual variation
+mod_res$year=format(mod_res$date,format="%Y")
+ts_single_clean["year"]=format(ts_single_clean$date,format="%Y")
+
+boxplot(ts_single_clean$ndvi~ts_single_clean$year,xlab="",ylab="NDVI")
+boxplot(ts_single_clean$savi~ts_single_clean$year,xlab="",ylab="SAVI")
+boxplot(ts_single_clean$evi~ts_single_clean$year,xlab="",ylab="EVI")
+boxplot(ts_single_clean$ireci~ts_single_clean$year,xlab="",ylab="IRECI")
+boxplot(ts_single_clean$ndrei~ts_single_clean$year,xlab="",ylab="NDREI")
+
+boxplot(mod_res$relawat~mod_res$year,xlab="",ylab="Relawat")
+boxplot(mod_res$tdef~mod_res$year,xlab="",ylab="Tdef")
+boxplot(mod_res$tratio~mod_res$year,xlab="",ylab="Tratio")
+
+
+
+##monthly variation
+mod_res$month=format(mod_res$date,format="%m")
+ts_single_clean["month"]=format(ts_single_clean$date,format="%m")
+
+boxplot(ts_single_clean$ndvi~ts_single_clean$month,xlab="",ylab="NDVI")
+boxplot(ts_single_clean$savi~ts_single_clean$month,xlab="",ylab="SAVI")
+boxplot(ts_single_clean$evi~ts_single_clean$month,xlab="",ylab="EVI")
+boxplot(ts_single_clean$ireci~ts_single_clean$month,xlab="",ylab="IRECI")
+boxplot(ts_single_clean$ndrei~ts_single_clean$month,xlab="",ylab="NDREI")
+
+boxplot(mod_res$relawat~mod_res$month,xlab="",ylab="Relawat")
+boxplot(mod_res$tdef~mod_res$month,xlab="",ylab="Tdef")
+boxplot(mod_res$tratio~mod_res$month,xlab="",ylab="Tratio")
+
+
+
 
 ##We need to refine the model parameterization first!
+
 
 ```
 
