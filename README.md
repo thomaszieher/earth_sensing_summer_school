@@ -62,9 +62,9 @@ https://www.isprs.org/documents/orangebook/app5.aspx
 
 <h2>Acknowledgements</h2>
 
-The methods and content of this assignment were elaborated within the WINALP-21 project, funded by the INTERREG VI-A program (grant number BA0100020).
+The methods and content of this assignment were elaborated within the WINALP-21 project, funded by the INTERREG VI-A program (grant number BA0100020). The Earth Sensing Summer School 2025 in San Vito di Cadore (Italy) is hosted by the University of Padova (Prof. Francesco Pirotti and Erico Kurchartt, PhD) and is funded by the ISPRS Education and Capacity Building Initiatives. Visit the website: https://www.cirgeo.unipd.it/est/earth-sensing-summer-school.html
 
-[<img src="https://github.com/thomaszieher/earth_sensing_summer_school/blob/main/plots/project_logo.jpg" width="600" />](https://github.com/thomaszieher/earth_sensing_summer_school/blob/main/plots/project_logo.jpg)  
+[<img src="https://github.com/thomaszieher/earth_sensing_summer_school/blob/main/plots/project_logo.png" width="300" />](https://github.com/thomaszieher/earth_sensing_summer_school/blob/main/plots/project_logo.png)  
 
 <h2>References</h2>
 
