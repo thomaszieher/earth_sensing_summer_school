@@ -158,7 +158,7 @@ soilgrid_points["gravel"]=propext(gravel,soil_sites)$gravel/1000.0
 soilgrid_points["corg"]=propext(corg,soil_sites)$corg/100.0
 soilgrid_points["bd"]=propext(bd,soil_sites)$bd/100.0
 
-soilgrid_points=soilgrid_points[order(soilgrid_points$upr),]
+soilgrid_points=soilgrid_points[order(soilgrid_points$id,soilgrid_points$upr),]
 soilgrid_points["topsoil"]=rep(c(1,1,0,0,0,0),times=length(unique(soilgrid_points$id)))
 soilgrid_points["horizon_nr"]=rep(1:6,times=length(unique(soilgrid_points$id)))
 
