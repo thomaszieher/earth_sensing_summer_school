@@ -1,0 +1,95 @@
+---
+title: "Introduction to LWF-Brook90"
+author: "Thomas Zieher"
+date: "2025-09-02"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r header,include=T}
+#####################################################
+##                                                 ##
+##      ######      #########  ##          ##      ##
+##      #######     ########   ##          ##      ##
+##      ##    ##    ##         ##          ##      ##
+##      ##   ##     ##         ##          ##      ##
+##      ######      ######     ##          ##      ##
+##      #######     #####      ##          ##      ##
+##      ##    ##    ##         ##    ##    ##      ##
+##      ##     ##   ##         ##   ####   ##      ##
+##      ##     ##   ##         ##  ##  ##  ##      ##
+##      ########    ##          ####    ####       ##
+##      #######     ##           ##      ##        ##
+##                                                 ##
+#####################################################
+##                                                 ##
+##  Author: Thomas Zieher                          ##
+##  Institute: Nat Haz, 6.3                        ##
+##  Date: 2025-09-02                               ##
+##  License: GNU GPL V.3 or later                  ##
+##                                                 ##
+#####################################################
+##  Description: Rmd template for exploring the model LWF-Brook90
+##  Environment: renv
+#####################################################
+
+##set include=F to omit header in output
+
+```
+
+
+```{r setup,include=FALSE}
+knitr::opts_chunk$set(echo=T)
+
+# library(remotes)
+# remotes::install_github(repo="pschmidtwalter/LWFBrook90R",build_vignettes=T,force=T)
+library(LWFBrook90R)
+library(data.table)
+
+```
+
+
+***
+### Check out vignettes
+
+```{r vignettes,echo=T,message=F,warning=F,error=F}
+
+browseVignettes("LWFBrook90R")
+
+```
+
+
+***
+### Introduction
+
+```{r intro,echo=T,warning=F,message=F}
+
+options_b90=set_optionsLWFB90()
+param_b90= set_paramLWFB90()
+
+```
+
+
+***
+### Aboveground vegetation characteristics
+
+```{r veg,echo=T,warning=F,message=F}
+
+LAI_b90=make_seasLAI(method=options_b90$lai_method,
+                     year=2003,
+                     maxlai=param_b90$maxlai,
+                     winlaifrac=param_b90$winlaifrac,
+                     budburst_doy=param_b90$budburstdoy,
+                     leaffall_doy=param_b90$leaffalldoy,
+                     emerge_dur=param_b90$emergedur,
+                     leaffall_dur=param_b90$leaffalldur
+                     )
+
+```
+
+
+### Next step: Go through the code blocks of 'Model control options and parameters'
+
+
+

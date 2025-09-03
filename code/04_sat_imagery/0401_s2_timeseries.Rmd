@@ -49,7 +49,7 @@ rm(list=ls())
 #install.packages("renv")
 
 ##install packages with respective version
-#renv::snapshot()
+renv::snapshot()
 renv::restore()
 
 

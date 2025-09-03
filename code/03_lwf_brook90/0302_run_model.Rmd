@@ -883,3 +883,9 @@ write.table(output_spruce[,c("date","tratio","tdef","relawat")],paste(model_path
 ```
 
 
+### Next steps: Improve model parameterization and identify sensitive model parameters
+
+* Meteorological data: check suitability of ERA5 reanalysis data for local SVAT modelling
+* Soil data: check suitability of soil grids data sets for SVAT modelling in an Alpine environment
+
+

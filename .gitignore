@@ -59,6 +59,7 @@ Thumbs.db
 *.Ruserdata
 *.rds
 *.rda
+*.csv
 Thumbs.db
 venv
 temp
