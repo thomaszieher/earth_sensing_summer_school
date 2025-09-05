@@ -26,7 +26,7 @@ Figure 1: Conceptual sketch of the model LWF-Brook90 (own figure)
 The model uses meteorological time series with daily resolution, soil input parameters and vegetation input parameters. We will derive meteorological input data from a local station and collect soil input data with a soil auger in the field. We will discuss the vegetation input parameters and integrate remote sensing data where possible.
  
 The following software will be used and should be installed on the student’s computer prior to the Summer School:  
-* R and RStudio
+* R, RTools and RStudio
 * The earth_sensing_summer_school repository (see instructions below)
 * GIS software: preferably QGIS: https://qgis.org/en/site/forusers/download.html#  
  
@@ -55,10 +55,11 @@ https://www.isprs.org/documents/orangebook/app5.aspx
 <h2>Installation instructions</h2>
 
 1. Install R 4.5.1: https://cran.r-project.org
-2. Install R Studio: https://posit.co/download/rstudio-desktop  
-3. Install GIT: https://git-scm.com/downloads  
-4. Clone repository: https://github.com/thomaszieher/earth_sensing_summer_school.git  
-5. Restore environment with ```renv::restore()```
+2. Install RTools: https://cran.r-project.org/bin
+3. Install R Studio: https://posit.co/download/rstudio-desktop  
+4. Install GIT: https://git-scm.com/downloads  
+5. Clone repository: https://github.com/thomaszieher/earth_sensing_summer_school.git  
+6. Restore environment with ```renv::restore()```
 
 <h2>Acknowledgements</h2>
 
