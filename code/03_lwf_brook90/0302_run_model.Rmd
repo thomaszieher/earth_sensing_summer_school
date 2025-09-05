@@ -278,12 +278,12 @@ Vegetation parameters
 
 ```{r vegetation,echo=T,message=F,warning=F,error=F}
 
-##load parameterizations for European beech and Norway spruce from other project
+##load parameterizations for oak (Quercus robur) and pine (Pinus sylvestris) from other project
 load(paste(model_path,"veg_param.rda",sep="/"))
 
 # ##individual vegetation parameterization
 # ##taken from Schmidt-Walter et al. (2020), Supplement
-# params_spruce=set_paramLWFB90(budburst_species="Picea abies (frueh)",
+# params_pine=set_paramLWFB90(budburst_species="Picea abies (frueh)",
 #                               maxlai=6,
 #                               winlaifrac=0.8,
 #                               height=25,
@@ -302,7 +302,7 @@ load(paste(model_path,"veg_param.rda",sep="/"))
 #                               cintrs=0.4
 #                               )
 # 
-# params_beech=set_paramLWFB90(budburst_species="Fagus sylvatica",
+# params_oak=set_paramLWFB90(budburst_species="Fagus sylvatica",
 #                              maxlai=6,
 #                              winlaifrac=0,
 #                              height=25,
@@ -335,34 +335,34 @@ ilayer=4 ##Number of layers from top to which infiltration is distributed
 infexp=0.6 ##Shape parameter for distribution of infiltration, for value 0 infiltration is in top layer only.
 
 ##set location's coordinates
-params_spruce$coords_x=location$lon
-params_spruce$coords_y=location$lat
-params_beech$coords_x=location$lon
-params_beech$coords_y=location$lat
+params_pine$coords_x=location$lon
+params_pine$coords_y=location$lat
+params_oak$coords_x=location$lon
+params_oak$coords_y=location$lat
 
 ##set location's aspect and slope angle
-params_spruce$aspect=location$aspect
-params_spruce$dslope=location$slope
-params_spruce$eslope=location$slope
-params_beech$aspect=location$aspect
-params_beech$dslope=location$slope
-params_beech$eslope=location$slope
+params_pine$aspect=location$aspect
+params_pine$dslope=location$slope
+params_pine$eslope=location$slope
+params_oak$aspect=location$aspect
+params_oak$dslope=location$slope
+params_oak$eslope=location$slope
   
 ##set location's rooting depth
-params_spruce$maxrootdepth=rooting_depth
-params_beech$maxrootdepth=rooting_depth
+params_pine$maxrootdepth=rooting_depth
+params_oak$maxrootdepth=rooting_depth
 
 ##set location's drainage parameter
-params_spruce$drain=drain
-params_beech$drain=drain
+params_pine$drain=drain
+params_oak$drain=drain
 
 ##set location's ilayer parameter
-params_spruce$ilayer=ilayer
-params_beech$ilayer=ilayer
+params_pine$ilayer=ilayer
+params_oak$ilayer=ilayer
 
 ##set location's infexp parameter
-params_spruce$infexp=infexp
-params_beech$infexp=infexp
+params_pine$infexp=infexp
+params_oak$infexp=infexp
 
 
 ```
@@ -374,17 +374,17 @@ params_beech$infexp=infexp
 
 ```{r model,echo=F,warning=F,error=F}
 
-res_spruce=run_LWFB90(options_b90=options_forest,
-                      param_b90=params_spruce,
-                      climate=meteo_daily,
-                      soil=soil
-                      )
+res_pine=run_LWFB90(options_b90=options_forest,
+                    param_b90=params_pine,
+                    climate=meteo_daily,
+                    soil=soil
+                    )
 
-res_beech=run_LWFB90(options_b90=options_forest,
-                     param_b90=params_beech,
-                     climate=meteo_daily,
-                     soil=soil
-                     )
+res_oak=run_LWFB90(options_b90=options_forest,
+                   param_b90=params_oak,
+                   climate=meteo_daily,
+                   soil=soil
+                   )
 
 ```
 
@@ -396,32 +396,32 @@ Daily water balance components
 ```{r wb_daily,echo=F,message=F,warning=F,error=F}
 
 ##bind evap-fluxes from result lists
-wb_spruce=rbindlist(list(`Spruce`=res_spruce$output),
-                         idcol="vegetation")
+wb_pine=rbindlist(list(`pine`=res_pine$output),
+                       idcol="vegetation")
 
-wb_beech=rbindlist(list(`Beech`=res_beech$output),
-                        idcol="vegetation")
+wb_oak=rbindlist(list(`oak`=res_oak$output),
+                      idcol="vegetation")
 
 ##add date
-wb_spruce$date=as.Date(sprintf("%i-%0.2i-%0.2i",wb_spruce$yr,wb_spruce$mo,wb_spruce$da),format="%Y-%m-%d")
-wb_beech$date=as.Date(sprintf("%i-%0.2i-%0.2i",wb_beech$yr,wb_beech$mo,wb_beech$da),format="%Y-%m-%d")
+wb_pine$date=as.Date(sprintf("%i-%0.2i-%0.2i",wb_pine$yr,wb_pine$mo,wb_pine$da),format="%Y-%m-%d")
+wb_oak$date=as.Date(sprintf("%i-%0.2i-%0.2i",wb_oak$yr,wb_oak$mo,wb_oak$da),format="%Y-%m-%d")
 
 ##add surface runoff
-wb_spruce[,surfrunoff := flow-vrfln]
-wb_beech[,surfrunoff := flow-vrfln]
+wb_pine[,surfrunoff := flow-vrfln]
+wb_oak[,surfrunoff := flow-vrfln]
 
 ##bind results
-wb=rbind(wb_spruce,wb_beech)
+wb=rbind(wb_pine,wb_oak)
 
 ##rfal and smlt from model results
 tmin=xts(meteo_daily$tmin,order.by=meteo_daily$dates)
 tmax=xts(meteo_daily$tmax,order.by=meteo_daily$dates)
 tmean=xts(meteo_daily$tmean,order.by=meteo_daily$dates)
 
-nprec=xts(wb_beech$rfal,order.by=wb_beech$date)
-sfal=xts(wb_beech$sfal,order.by=wb_beech$date)
-smlt=xts(-wb_beech$smlt,order.by=wb_beech$date)
-srf=xts(-wb_beech$surfrunoff,order.by=wb_beech$date)
+nprec=xts(wb_oak$rfal,order.by=wb_oak$date)
+sfal=xts(wb_oak$sfal,order.by=wb_oak$date)
+smlt=xts(-wb_oak$smlt,order.by=wb_oak$date)
+srf=xts(-wb_oak$surfrunoff,order.by=wb_oak$date)
 
 tseries_plot=merge(tmin,tmax,tmean,nprec,sfal,smlt,srf)
 
@@ -456,46 +456,46 @@ dygraph(tseries_plot,width=600,height=400) %>%
 ```{r indices,echo=F,warning=F,error=F}
 
 ##re-read outputs
-output_beech=wb_beech
-output_spruce=wb_spruce
+output_oak=wb_oak
+output_pine=wb_pine
 
-##indices beech
-output_beech$tratio=output_beech$tran/output_beech$ptran
-output_beech$tratio[output_beech$tratio>1]=1
-output_beech$tratio[is.nan(output_beech$tratio)]=1
-output_beech$tratio[is.infinite(output_beech$tratio)]=1
-output_beech$tdef=output_beech$ptran-output_beech$tran
-output_beech$tdef[output_beech$tdef<0]=0
+##indices oak
+output_oak$tratio=output_oak$tran/output_oak$ptran
+output_oak$tratio[output_oak$tratio>1]=1
+output_oak$tratio[is.nan(output_oak$tratio)]=1
+output_oak$tratio[is.infinite(output_oak$tratio)]=1
+output_oak$tdef=output_oak$ptran-output_oak$tran
+output_oak$tdef[output_oak$tdef<0]=0
 
-##indices spruce
-output_spruce$tratio=output_spruce$tran/output_spruce$ptran
-output_spruce$tratio[output_spruce$tratio>1]=1
-output_spruce$tratio[is.nan(output_spruce$tratio)]=1
-output_spruce$tratio[is.infinite(output_spruce$tratio)]=1
-output_spruce$tdef=output_spruce$ptran-output_spruce$tran
-output_spruce$tdef[output_spruce$tdef<0]=0
+##indices pine
+output_pine$tratio=output_pine$tran/output_pine$ptran
+output_pine$tratio[output_pine$tratio>1]=1
+output_pine$tratio[is.nan(output_pine$tratio)]=1
+output_pine$tratio[is.infinite(output_pine$tratio)]=1
+output_pine$tdef=output_pine$ptran-output_pine$tran
+output_pine$tdef[output_pine$tdef<0]=0
 
 ##calc indices for mixed forest
-mixed=data.frame(doy=output_beech$doy,
-                 yr=output_beech$yr,
-                 date=output_beech$date,
-                 rnet=apply(cbind(output_beech$rnet,output_spruce$rnet),1,FUN="mean",na.rm=T),
-                 smlt=apply(cbind(output_beech$smlt,output_spruce$smlt),1,FUN="mean",na.rm=T),
-                 relawat=apply(cbind(output_beech$relawat,output_spruce$relawat),1,FUN="mean",na.rm=T),
-                 tdef=apply(cbind(output_beech$tdef,output_spruce$tdef),1,FUN="mean",na.rm=T),
-                 tratio=apply(cbind(output_beech$tratio,output_spruce$tratio),1,FUN="mean",na.rm=T)
+mixed=data.frame(doy=output_oak$doy,
+                 yr=output_oak$yr,
+                 date=output_oak$date,
+                 rnet=apply(cbind(output_oak$rnet,output_pine$rnet),1,FUN="mean",na.rm=T),
+                 smlt=apply(cbind(output_oak$smlt,output_pine$smlt),1,FUN="mean",na.rm=T),
+                 relawat=apply(cbind(output_oak$relawat,output_pine$relawat),1,FUN="mean",na.rm=T),
+                 tdef=apply(cbind(output_oak$tdef,output_pine$tdef),1,FUN="mean",na.rm=T),
+                 tratio=apply(cbind(output_oak$tratio,output_pine$tratio),1,FUN="mean",na.rm=T)
 )
 
 
 ##define colors
-col_beech="#ff916e"
-col_spruce="#159837"
+col_oak="#ff916e"
+col_pine="#159837"
 col_mixed="#a387ff"
-cols_treesp=c(col_beech,col_spruce,col_mixed)
+cols_treesp=c(col_oak,col_pine,col_mixed)
 
 ##prec and snow melt
-prec=xts(mixed$rnet[mixed$yr%in%unique(output_beech$yr)],order.by=mixed$date[mixed$yr%in%unique(output_beech$yr)])
-smlt=xts(mixed$smlt[mixed$yr%in%unique(output_beech$yr)],order.by=mixed$date[mixed$yr%in%unique(output_beech$yr)])
+prec=xts(mixed$rnet[mixed$yr%in%unique(output_oak$yr)],order.by=mixed$date[mixed$yr%in%unique(output_oak$yr)])
+smlt=xts(mixed$smlt[mixed$yr%in%unique(output_oak$yr)],order.by=mixed$date[mixed$yr%in%unique(output_oak$yr)])
 
 ```
 
@@ -506,25 +506,25 @@ smlt=xts(mixed$smlt[mixed$yr%in%unique(output_beech$yr)],order.by=mixed$date[mix
 ```{r swati,echo=F,warning=F,error=F}
 
 ##bind evap-fluxes from result lists
-swat_spruce=rbindlist(list(`Spruce`=res_spruce$layer_output),
-                      idcol="vegetation")
+swat_pine=rbindlist(list(`pine`=res_pine$layer_output),
+                    idcol="vegetation")
 
-swat_beech=rbindlist(list(`Beech`=res_beech$layer_output),
-                     idcol="vegetation")
+swat_oak=rbindlist(list(`oak`=res_oak$layer_output),
+                   idcol="vegetation")
 
 
 ##add dates to outputs
-swat_spruce[,dates:=as.POSIXct(paste(yr,mo,da,sep="-"),tz="UTC")]
-swat_beech[,dates:=as.POSIXct(paste(yr,mo,da,sep="-"),tz="UTC")]
+swat_pine[,dates:=as.POSIXct(paste(yr,mo,da,sep="-"),tz="UTC")]
+swat_oak[,dates:=as.POSIXct(paste(yr,mo,da,sep="-"),tz="UTC")]
 
 ##get theta at topmost soil layer
-swat_spruce_nl=swat_spruce[which(nl==2),list(theta=mean(theta)),by=dates]
-swat_beech_nl=swat_beech[which(nl==2),list(theta=mean(theta)),by=dates]
+swat_pine_nl=swat_pine[which(nl==2),list(theta=mean(theta)),by=dates]
+swat_oak_nl=swat_oak[which(nl==2),list(theta=mean(theta)),by=dates]
 
 ##compare
-ts_swat_spruce_nl=xts(swat_spruce_nl$theta*100,order.by=swat_spruce_nl$dates)
-ts_swat_beech_nl=xts(swat_beech_nl$theta*100,order.by=swat_beech_nl$dates)
-tseries_plot_nl=merge(prec,smlt,ts_swat_beech_nl,ts_swat_spruce_nl)
+ts_swat_pine_nl=xts(swat_pine_nl$theta*100,order.by=swat_pine_nl$dates)
+ts_swat_oak_nl=xts(swat_oak_nl$theta*100,order.by=swat_oak_nl$dates)
+tseries_plot_nl=merge(prec,smlt,ts_swat_oak_nl,ts_swat_pine_nl)
 
 ##fill missing 15min measurements with closest measurement
 #tseries_smc_filled=na.locf(tseries_plot,fromLast=F,maxgap=10)
@@ -538,8 +538,8 @@ dygraph(tseries_plot_nl,width="auto",height=400) %>%
   dyBarSeries('prec',label="Rainfall [mm/d]",axis="y2") %>%  
   dyBarSeries('smlt',label="Snow melt [mm/d]",axis="y2") %>% 
   dyOptions(stackedGraph=T,colors=cols_prec) %>%
-  dySeries('ts_swat_beech_nl',label="SMC beech nl [%]",axis="y") %>%
-  dySeries('ts_swat_spruce_nl',label="SMC spruce nl [%]",axis="y") %>%
+  dySeries('ts_swat_oak_nl',label="SMC oak nl [%]",axis="y") %>%
+  dySeries('ts_swat_pine_nl',label="SMC pine nl [%]",axis="y") %>%
   dyRangeSelector(height=20) %>%
   dyOptions(stackedGraph=F,colors=cols_prec) %>%
   dyLegend()
@@ -555,21 +555,21 @@ Values <Q01 are shown as point markers
 
 ##plot all years
 par(mfrow=c(6,1),mar=c(2,4,3,1),pty="m")
-#year_plot=unique(output_beech$yr)[1]
-for (year_plot in unique(output_beech$yr)){
-  beech_sub=output_beech[output_beech$yr==year_plot,]
-  spruce_sub=output_spruce[output_spruce$yr==year_plot,]
+#year_plot=unique(output_oak$yr)[1]
+for (year_plot in unique(output_oak$yr)){
+  oak_sub=output_oak[output_oak$yr==year_plot,]
+  pine_sub=output_pine[output_pine$yr==year_plot,]
   mixed_sub=mixed[mixed$yr==year_plot,]
   
   plot(NA,NA,xlim=c(1,366),ylim=c(0,2),xlab="",ylab="Relative extractable water",main=sprintf("Relative extractable water %i",year_plot))
-  lines(beech_sub$doy,beech_sub$relawat,col=col_beech)
-  lines(spruce_sub$doy,spruce_sub$relawat,col=col_spruce)
+  lines(oak_sub$doy,oak_sub$relawat,col=col_oak)
+  lines(pine_sub$doy,pine_sub$relawat,col=col_pine)
   lines(mixed_sub$doy,mixed_sub$relawat,col=col_mixed)
 
-  points(beech_sub$doy[beech_sub$relawat<quantile(na.omit(beech_sub$relawat),0.01)],
-         beech_sub$relawat[beech_sub$relawat<quantile(na.omit(beech_sub$relawat),0.01)],col=col_beech,pch=1)
-  points(spruce_sub$doy[spruce_sub$relawat<quantile(na.omit(spruce_sub$relawat),0.01)],
-         spruce_sub$relawat[spruce_sub$relawat<quantile(na.omit(spruce_sub$relawat),0.01)],col=col_spruce,pch=3)
+  points(oak_sub$doy[oak_sub$relawat<quantile(na.omit(oak_sub$relawat),0.01)],
+         oak_sub$relawat[oak_sub$relawat<quantile(na.omit(oak_sub$relawat),0.01)],col=col_oak,pch=1)
+  points(pine_sub$doy[pine_sub$relawat<quantile(na.omit(pine_sub$relawat),0.01)],
+         pine_sub$relawat[pine_sub$relawat<quantile(na.omit(pine_sub$relawat),0.01)],col=col_pine,pch=3)
   points(mixed_sub$doy[mixed_sub$relawat<quantile(na.omit(mixed_sub$relawat),0.01)],
          mixed_sub$relawat[mixed_sub$relawat<quantile(na.omit(mixed_sub$relawat),0.01)],col=col_mixed,pch=5)
   
@@ -578,7 +578,7 @@ for (year_plot in unique(output_beech$yr)){
   abline(h=0.4,col="orange",lty=2)
   abline(h=1,col="green",lty=2)
   
-  legend("topright",legend=c("Beech","Spruce","Mixed"),lwd=2,pch=c(1,3,5),col=cols_treesp)
+  legend("topright",legend=c("Oak","Pine","Mixed"),lwd=2,pch=c(1,3,5),col=cols_treesp)
   
 }
 
@@ -586,11 +586,11 @@ for (year_plot in unique(output_beech$yr)){
 ##dygraph
 cols=c("#0800ff","#44bbff",cols_treesp)
 ##rfal and smlt from model results
-Beech=xts(output_beech$relawat[output_beech$yr%in%unique(output_beech$yr)],order.by=output_beech$date[output_beech$yr%in%unique(output_beech$yr)])
-Spruce=xts(output_spruce$relawat[output_spruce$yr%in%unique(output_beech$yr)],order.by=output_spruce$date[output_spruce$yr%in%unique(output_beech$yr)])
-Mixed=xts(mixed$relawat[mixed$yr%in%unique(output_beech$yr)],order.by=mixed$date[mixed$yr%in%unique(output_beech$yr)])
+Oak=xts(output_oak$relawat[output_oak$yr%in%unique(output_oak$yr)],order.by=output_oak$date[output_oak$yr%in%unique(output_oak$yr)])
+Pine=xts(output_pine$relawat[output_pine$yr%in%unique(output_oak$yr)],order.by=output_pine$date[output_pine$yr%in%unique(output_oak$yr)])
+Mixed=xts(mixed$relawat[mixed$yr%in%unique(output_oak$yr)],order.by=mixed$date[mixed$yr%in%unique(output_oak$yr)])
 
-tseries_plot=merge(prec,smlt,Beech,Spruce,Mixed)
+tseries_plot=merge(prec,smlt,Oak,Pine,Mixed)
 
 ##fill missing 15min measurements with closest measurement
 #tseries_smc_filled=na.locf(tseries_plot,fromLast=F,maxgap=10)
@@ -598,7 +598,7 @@ tseries_plot=merge(prec,smlt,Beech,Spruce,Mixed)
 dygraphs::dygraph(tseries_plot,width=600,height=400) %>%
   dyAxis("y",label="Relative extractable water (REW)",valueRange=c(0,2)) %>%
   dyAxis("y2",label="Net rainfall & snow melt (mixed forest) [mm]",valueRange=c(50,0)) %>%
-  dyGroup(c("Beech","Spruce","Mixed"),drawPoints=F,color=cols_treesp,axis="y") %>%
+  dyGroup(c("Oak","Pine","Mixed"),drawPoints=F,color=cols_treesp,axis="y") %>%
   dyLimit(0.2,strokePattern="dashed",color="red") %>%
   dyLimit(0.4,strokePattern="dashed",color="orange") %>%
   dyLimit(1,strokePattern="dashed",color="green") %>%
@@ -619,21 +619,21 @@ Values <Q01 are shown as point markers
 
 ##plot all years
 par(mfrow=c(6,1),mar=c(2,4,3,1),pty="m")
-#year_plot=unique(output_beech$yr)[1]
-for (year_plot in unique(output_beech$yr)){
-  beech_sub=output_beech[output_beech$yr==year_plot,]
-  spruce_sub=output_spruce[output_spruce$yr==year_plot,]
+#year_plot=unique(output_oak$yr)[1]
+for (year_plot in unique(output_oak$yr)){
+  oak_sub=output_oak[output_oak$yr==year_plot,]
+  pine_sub=output_pine[output_pine$yr==year_plot,]
   mixed_sub=mixed[mixed$yr==year_plot,]
   
   plot(NA,NA,xlim=c(1,366),ylim=c(0,8),xlab="",ylab="Transpiration deficit [mm]",main=sprintf("Transpiration deficit %i",year_plot))
-  lines(beech_sub$doy,beech_sub$tdef,col=col_beech)
-  lines(spruce_sub$doy,spruce_sub$tdef,col=col_spruce)
+  lines(oak_sub$doy,oak_sub$tdef,col=col_oak)
+  lines(pine_sub$doy,pine_sub$tdef,col=col_pine)
   lines(mixed_sub$doy,mixed_sub$tdef,col=col_mixed)
 
-  points(beech_sub$doy[beech_sub$tdef<quantile(na.omit(beech_sub$tdef),0.01)],
-         beech_sub$tdef[beech_sub$tdef<quantile(na.omit(beech_sub$tdef),0.01)],col=col_beech,pch=1)
-  points(spruce_sub$doy[spruce_sub$tdef<quantile(na.omit(spruce_sub$tdef),0.01)],
-         spruce_sub$tdef[spruce_sub$tdef<quantile(na.omit(spruce_sub$tdef),0.01)],col=col_spruce,pch=3)
+  points(oak_sub$doy[oak_sub$tdef<quantile(na.omit(oak_sub$tdef),0.01)],
+         oak_sub$tdef[oak_sub$tdef<quantile(na.omit(oak_sub$tdef),0.01)],col=col_oak,pch=1)
+  points(pine_sub$doy[pine_sub$tdef<quantile(na.omit(pine_sub$tdef),0.01)],
+         pine_sub$tdef[pine_sub$tdef<quantile(na.omit(pine_sub$tdef),0.01)],col=col_pine,pch=3)
   points(mixed_sub$doy[mixed_sub$tdef<quantile(na.omit(mixed_sub$tdef),0.01)],
          mixed_sub$tdef[mixed_sub$tdef<quantile(na.omit(mixed_sub$tdef),0.01)],col=col_mixed,pch=5)
   
@@ -641,18 +641,18 @@ for (year_plot in unique(output_beech$yr)){
   abline(h=0.25,col="red",lty=2)
   abline(h=0.75,col="orange",lty=2)
   
-  legend("bottomright",legend=c("Beech","Spruce","Mixed"),lwd=2,pch=c(1,3,5),col=cols_treesp)
+  legend("bottomright",legend=c("Oak","Pine","Mixed"),lwd=2,pch=c(1,3,5),col=cols_treesp)
   
 }
 
 
 ##dygraph
 ##rfal and smlt from model results
-Beech=xts(output_beech$tdef[output_beech$yr%in%unique(output_beech$yr)],order.by=output_beech$date[output_beech$yr%in%unique(output_beech$yr)])
-Spruce=xts(output_spruce$tdef[output_spruce$yr%in%unique(output_beech$yr)],order.by=output_spruce$date[output_spruce$yr%in%unique(output_beech$yr)])
-Mixed=xts(mixed$tdef[mixed$yr%in%unique(output_beech$yr)],order.by=mixed$date[mixed$yr%in%unique(output_beech$yr)])
+Oak=xts(output_oak$tdef[output_oak$yr%in%unique(output_oak$yr)],order.by=output_oak$date[output_oak$yr%in%unique(output_oak$yr)])
+Pine=xts(output_pine$tdef[output_pine$yr%in%unique(output_oak$yr)],order.by=output_pine$date[output_pine$yr%in%unique(output_oak$yr)])
+Mixed=xts(mixed$tdef[mixed$yr%in%unique(output_oak$yr)],order.by=mixed$date[mixed$yr%in%unique(output_oak$yr)])
 
-tseries_plot=merge(prec,smlt,Beech,Spruce,Mixed)
+tseries_plot=merge(prec,smlt,Oak,Pine,Mixed)
 
 ##fill missing 15min measurements with closest measurement
 #tseries_smc_filled=na.locf(tseries_plot,fromLast=F,maxgap=10)
@@ -661,7 +661,7 @@ tseries_plot=merge(prec,smlt,Beech,Spruce,Mixed)
 dygraphs::dygraph(tseries_plot,width=600,height=400) %>%
   dyAxis("y",label="Transpiration deficit [mm]",valueRange=c(0,10)) %>%
   dyAxis("y2",label="Net rainfall & snow melt (mixed forest) [mm]",valueRange=c(50,0)) %>%
-  dyGroup(c("Beech","Spruce","Mixed"),drawPoints=F,color=cols_treesp,axis="y") %>%
+  dyGroup(c("Oak","Pine","Mixed"),drawPoints=F,color=cols_treesp,axis="y") %>%
   dyLimit(0.25,strokePattern="dashed",color="red") %>%
   dyLimit(0.75,strokePattern="dashed",color="orange") %>%
   dyOptions(stackedGraph=F,colors=cols) %>%
@@ -681,21 +681,21 @@ Values <Q01 are shown as point markers
 
 ##plot all years
 par(mfrow=c(6,1),mar=c(2,4,3,1),pty="m")
-#year_plot=unique(output_beech$yr)[1]
-for (year_plot in unique(output_beech$yr)){
-  beech_sub=output_beech[output_beech$yr==year_plot,]
-  spruce_sub=output_spruce[output_spruce$yr==year_plot,]
+#year_plot=unique(output_oak$yr)[1]
+for (year_plot in unique(output_oak$yr)){
+  oak_sub=output_oak[output_oak$yr==year_plot,]
+  pine_sub=output_pine[output_pine$yr==year_plot,]
   mixed_sub=mixed[mixed$yr==year_plot,]
   
   plot(NA,NA,xlim=c(1,366),ylim=c(0,1),xlab="",ylab="Transpiration ratio",main=sprintf("Transpiration ratio %i",year_plot))
-  lines(beech_sub$doy,beech_sub$tratio,col=col_beech)
-  lines(spruce_sub$doy,spruce_sub$tratio,col=col_spruce)
+  lines(oak_sub$doy,oak_sub$tratio,col=col_oak)
+  lines(pine_sub$doy,pine_sub$tratio,col=col_pine)
   lines(mixed_sub$doy,mixed_sub$tratio,col=col_mixed)
 
-  points(beech_sub$doy[beech_sub$tratio<quantile(na.omit(beech_sub$tratio),0.01)],
-         beech_sub$tratio[beech_sub$tratio<quantile(na.omit(beech_sub$tratio),0.01)],col=col_beech,pch=1)
-  points(spruce_sub$doy[spruce_sub$tratio<quantile(na.omit(spruce_sub$tratio),0.01)],
-         spruce_sub$tratio[spruce_sub$tratio<quantile(na.omit(spruce_sub$tratio),0.01)],col=col_spruce,pch=3)
+  points(oak_sub$doy[oak_sub$tratio<quantile(na.omit(oak_sub$tratio),0.01)],
+         oak_sub$tratio[oak_sub$tratio<quantile(na.omit(oak_sub$tratio),0.01)],col=col_oak,pch=1)
+  points(pine_sub$doy[pine_sub$tratio<quantile(na.omit(pine_sub$tratio),0.01)],
+         pine_sub$tratio[pine_sub$tratio<quantile(na.omit(pine_sub$tratio),0.01)],col=col_pine,pch=3)
   points(mixed_sub$doy[mixed_sub$tratio<quantile(na.omit(mixed_sub$tratio),0.01)],
          mixed_sub$tratio[mixed_sub$tratio<quantile(na.omit(mixed_sub$tratio),0.01)],col=col_mixed,pch=5)
   
@@ -703,18 +703,18 @@ for (year_plot in unique(output_beech$yr)){
   abline(h=0.25,col="red",lty=2)
   abline(h=0.75,col="orange",lty=2)
   
-  legend("bottomright",legend=c("Beech","Spruce","Mixed"),lwd=2,pch=c(1,3,5),col=cols_treesp)
+  legend("bottomright",legend=c("Oak","Pine","Mixed"),lwd=2,pch=c(1,3,5),col=cols_treesp)
   
 }
 
 
 ##dygraph
 ##rfal and smlt from model results
-Beech=xts(output_beech$tratio[output_beech$yr%in%unique(output_beech$yr)],order.by=output_beech$date[output_beech$yr%in%unique(output_beech$yr)])
-Spruce=xts(output_spruce$tratio[output_spruce$yr%in%unique(output_beech$yr)],order.by=output_spruce$date[output_spruce$yr%in%unique(output_beech$yr)])
-Mixed=xts(mixed$tratio[mixed$yr%in%unique(output_beech$yr)],order.by=mixed$date[mixed$yr%in%unique(output_beech$yr)])
+Oak=xts(output_oak$tratio[output_oak$yr%in%unique(output_oak$yr)],order.by=output_oak$date[output_oak$yr%in%unique(output_oak$yr)])
+Pine=xts(output_pine$tratio[output_pine$yr%in%unique(output_oak$yr)],order.by=output_pine$date[output_pine$yr%in%unique(output_oak$yr)])
+Mixed=xts(mixed$tratio[mixed$yr%in%unique(output_oak$yr)],order.by=mixed$date[mixed$yr%in%unique(output_oak$yr)])
 
-tseries_plot=merge(prec,smlt,Beech,Spruce,Mixed)
+tseries_plot=merge(prec,smlt,Oak,Pine,Mixed)
 
 ##fill missing 15min measurements with closest measurement
 #tseries_smc_filled=na.locf(tseries_plot,fromLast=F,maxgap=10)
@@ -725,7 +725,7 @@ par(mar=c(5,5,5,5))
 dygraphs::dygraph(tseries_plot,width=600,height=400) %>%
   dyAxis("y",label="Transpiration ratio",valueRange=c(0,1)) %>%
   dyAxis("y2",label="Net rainfall & snow melt (mixed forest) [mm]",valueRange=c(50,0)) %>%
-  dyGroup(c("Beech","Spruce","Mixed"),drawPoints=F,color=cols_treesp,axis="y") %>%
+  dyGroup(c("Oak","Pine","Mixed"),drawPoints=F,color=cols_treesp,axis="y") %>%
   dyLimit(0.25,strokePattern="dashed",color="red") %>%
   dyLimit(0.75,strokePattern="dashed",color="orange") %>%
   dyOptions(stackedGraph=F,colors=cols) %>%
@@ -756,24 +756,24 @@ polygon(x=c(as.Date("2019-01-01"),as.Date("2025-01-01"),as.Date("2025-01-01"),as
         y=c(0.4,0.4,1.0,1.0,0.4),border=NA,col="#00aa0040")
 polygon(x=c(as.Date("2019-01-01"),as.Date("2025-01-01"),as.Date("2025-01-01"),as.Date("2019-01-01"),as.Date("2019-01-01")),
         y=c(1.0,1.0,1.4,1.4,1.0),border=NA,col="#0000aa40")
-lines(output_beech$date,output_beech$relawat,col=col_beech)
-lines(output_spruce$date,output_spruce$relawat,col=col_spruce)
+lines(output_oak$date,output_oak$relawat,col=col_oak)
+lines(output_pine$date,output_pine$relawat,col=col_pine)
 lines(mixed$date,mixed$relawat,col=col_mixed)
 
 plot(NA,NA,xlim=c(as.Date("2019-01-01"),as.Date("2025-01-01")),ylim=c(0,8),xlab="",ylab="Transpiration deficit [mm]",main="Transpiration deficit",axes=F)
 axis(side=1,at=xticks,labels=format(xticks,format="%Y"))
 axis(side=2,las=1)
-lines(output_beech$date,output_beech$tdef,col=col_beech)
-lines(output_spruce$date,output_spruce$tdef,col=col_spruce)
+lines(output_oak$date,output_oak$tdef,col=col_oak)
+lines(output_pine$date,output_pine$tdef,col=col_pine)
 lines(mixed_sub$doy,mixed_sub$tdef,col=col_mixed)
 
 plot(NA,NA,xlim=c(as.Date("2019-01-01"),as.Date("2025-01-01")),ylim=c(0,1),xlab="",ylab="Transpiration ratio",main="Transpiration ratio",axes=F)
 axis(side=1,at=xticks,labels=format(xticks,format="%Y"))
 axis(side=2,las=1)
-lines(output_beech$date,output_beech$tratio,col=col_beech)
-lines(output_spruce$date,output_spruce$tratio,col=col_spruce)
+lines(output_oak$date,output_oak$tratio,col=col_oak)
+lines(output_pine$date,output_pine$tratio,col=col_pine)
 lines(mixed_sub$doy,mixed_sub$tratio,col=col_mixed)
-legend("bottomright",legend=c("Beech","Spruce","Mixed"),lwd=2,col=cols_treesp)
+legend("bottomright",legend=c("Oak","Pine","Mixed"),lwd=2,col=cols_treesp)
 
 ```
 
@@ -816,14 +816,14 @@ evap_m=evapmon[yr %in% year(start_date):year(end_date),lapply(.SD, mean),by=list
 
 ##melt
 hgts=melt(evap_m[,list(vegetation,mo,
-                          evap=evap,
-                          gevp=slvp+snvp,
-                          ievp=irvp+isvp,
-                          tran,
-                          tdiff=ptran-tran,
-                          vrfln=-vrfln,
-                          surfrunoff=-surfrunoff,
-                          flow=-flow)],
+                       evap=evap,
+                       gevp=slvp+snvp,
+                       ievp=irvp+isvp,
+                       tran,
+                       tdiff=ptran-tran,
+                       vrfln=-vrfln,
+                       surfrunoff=-surfrunoff,
+                       flow=-flow)],
           id.vars=c("vegetation","mo"))
 
 
@@ -877,12 +877,13 @@ print(p_budg)
 
 ```{r write,echo=F,warning=F,error=F}
 
-write.table(output_beech[,c("date","tratio","tdef","relawat")],paste(model_path,sprintf("wb_indices_%s_beech.csv",pid),sep="/"),sep=";",quote=F,row.names=F)
-write.table(output_spruce[,c("date","tratio","tdef","relawat")],paste(model_path,sprintf("wb_indices_%s_spruce.csv",pid),sep="/"),sep=";",quote=F,row.names=F)
+write.table(output_oak[,c("date","tratio","tdef","relawat")],paste(model_path,sprintf("wb_indices_%s_oak.csv",pid),sep="/"),sep=";",quote=F,row.names=F)
+write.table(output_pine[,c("date","tratio","tdef","relawat")],paste(model_path,sprintf("wb_indices_%s_pine.csv",pid),sep="/"),sep=";",quote=F,row.names=F)
 
 ```
 
 
+***
 ### Next steps: Improve model parameterization and identify sensitive model parameters
 
 * Meteorological data: check suitability of ERA5 reanalysis data for local SVAT modelling

@@ -101,9 +101,9 @@ aoi_wgs84=sf::st_transform(aoi,crs="EPSG:4326")
 
 
 ##set tree species of model results
-tree_species="spruce"#"beech"#
+tree_species="pine"#"oak"#
 ##select pid
-pid="P4"#"P3"#"P2"#"P1"
+pid="P1"#"P2"#"P3"#"P4"#
 
 ```
 
