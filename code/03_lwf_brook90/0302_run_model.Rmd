@@ -276,15 +276,15 @@ Soil profile
 ```{r soil,echo=T,message=F,warning=F,error=F}
 
 
-##import soil data
-soilgrid_profiles=readRDS(paste(soil_path,"soilgrids_profiles.rds",sep="/"))
-sites=aqp::site(soilgrid_profiles)
-profiles=aqp::horizons(soilgrid_profiles)
-
-##get single location
-location=sites[sites$id==pid,]
-
-
+# ##import soil data
+# soilgrid_profiles=readRDS(paste(soil_path,"soilgrids_profiles.rds",sep="/"))
+# sites=aqp::site(soilgrid_profiles)
+# profiles=aqp::horizons(soilgrid_profiles)
+# 
+# ##get single location
+# location=sites[sites$id==pid,]
+# 
+# 
 # ##take soilgrids profile
 # soil=profiles[profiles$id==pid,]
 # 
@@ -305,7 +305,7 @@ soil_raw=data.table(upper=c(0,-0.08,-0.13,-0.48),
                     lower=c(-0.08,-0.13,-0.48,-0.73))
 soil_raw$hor_num=1:nrow(soil_raw)
 soil_raw$horizon=c("FH","Ah","Bv","Cv")
-soil_raw$gravel=c(0,0.4,0.6,0.95)
+soil_raw$gravel=c(0,0.3,0.6,0.95)
 
 ##add numeric values (mean) of soil bulk density estimated in the field
 #"Class 1: very low (0.9-1.2 kg/dm3)"
@@ -356,45 +356,45 @@ Vegetation parameters
 ##load parameterizations for oak (Quercus robur) and pine (Pinus sylvestris) from other project
 load(paste(model_path,"veg_param.rda",sep="/"))
 
-# ##individual vegetation parameterization
-# ##taken from Schmidt-Walter et al. (2020), Supplement
-# params_pine=set_paramLWFB90(budburst_species="Picea abies (frueh)",
-#                               maxlai=6,
-#                               winlaifrac=0.8,
-#                               height=25,
-#                               sai=0.035*25,
-#                               glmax=0.0053,
-#                               radex=0.5,
-#                               alb=0.14,
-#                               albsn=0.14,
-#                               maxrlen=3100,
-#                               betaroot=0.976,
-#                               maxrootdepth=-1.2,
-#                               lwidth=0.004,
-#                               frintlai=0.12,
-#                               frintsai=0.14,
-#                               cintrl=0.2,
-#                               cintrs=0.4
-#                               )
-# 
-# params_oak=set_paramLWFB90(budburst_species="Fagus sylvatica",
-#                              maxlai=6,
-#                              winlaifrac=0,
-#                              height=25,
-#                              sai=0.035*25,
-#                              glmax=0.0053,
-#                              radex=0.6,
-#                              alb=0.18,
-#                              albsn=0.23,
-#                              maxrlen=3500,
-#                              betaroot=0.966,
-#                              maxrootdepth=-1.4,
-#                              lwidth=0.05,
-#                              frintlai=0.12,
-#                              frintsai=0.25,
-#                              cintrl=0.2,
-#                              cintrs=0.4
-#                              )
+##individual vegetation parameterization
+##taken from Schmidt-Walter et al. (2020), Supplement
+params_pine=set_paramLWFB90(budburst_species="Picea abies (frueh)",
+                              maxlai=6,
+                              winlaifrac=0.8,
+                              height=25,
+                              sai=0.035*25,
+                              glmax=0.0053,
+                              radex=0.5,
+                              alb=0.14,
+                              albsn=0.14,
+                              maxrlen=3100,
+                              betaroot=0.976,
+                              maxrootdepth=-1.2,
+                              lwidth=0.004,
+                              frintlai=0.12,
+                              frintsai=0.14,
+                              cintrl=0.2,
+                              cintrs=0.4
+                              )
+
+params_oak=set_paramLWFB90(budburst_species="Fagus sylvatica",
+                             maxlai=6,
+                             winlaifrac=0,
+                             height=25,
+                             sai=0.035*25,
+                             glmax=0.0053,
+                             radex=0.6,
+                             alb=0.18,
+                             albsn=0.23,
+                             maxrlen=3500,
+                             betaroot=0.966,
+                             maxrootdepth=-1.4,
+                             lwidth=0.05,
+                             frintlai=0.12,
+                             frintsai=0.25,
+                             cintrl=0.2,
+                             cintrs=0.4
+                             )
 
 ```
 
