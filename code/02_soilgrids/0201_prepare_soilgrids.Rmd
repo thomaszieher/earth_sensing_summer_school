@@ -38,7 +38,6 @@ editor_options:
 
 ```
 
-
 ```{r setup,include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 
@@ -71,23 +70,32 @@ soilgrids_path=paste(root,"data/soilgrids",sep="/")
 
 ```
 
+------------------------------------------------------------------------
 
-***
 ### Define points of interest
 
 ```{r poi,echo=T,warning=F,error=F}
 
-sites=data.frame(id=c("P1","P2","P3","P4"),
-                 lon=c(12.215,12.1797,12.2125,12.1948),
-                 lat=c(46.449,46.4465,46.4685,46.4559),
-                 aspect=c(290,40,210,80),
-                 slope=c(25,30,30,25)
-)
+# sites=data.frame(id=c("P1","P2","P3","P4"),
+#                  lon=c(12.215,12.1797,12.2125,12.1948),
+#                  lat=c(46.449,46.4465,46.4685,46.4559),
+#                  aspect=c(290,40,210,80),
+#                  slope=c(25,30,30,25)
+# )
+
+# Point of interest for San Vito di Cadore study site
+# Three tree locations provided by Enrico and slope calculated in QGIS with Gdal slope tool
+sites = data.frame(id=c("P1", "P2", "P3"),
+                   lon=c(12.20778, 12.207777, 12.207675),
+                   lat=c(46.47071, 46.470775, 46.470439),
+                   aspect=c(271, 280, 247),
+                   slope=c(28, 21, 20)
+                   )
 
 ```
 
+------------------------------------------------------------------------
 
-***
 ### Soil grids data
 
 ```{r soil_grids,echo=F,message=F,warning=F,error=F}
@@ -216,4 +224,3 @@ saveRDS(soilgrid_database,paste(soilgrids_path,"soilgrids_profiles.rds",sep="/")
 
 
 ```
-
