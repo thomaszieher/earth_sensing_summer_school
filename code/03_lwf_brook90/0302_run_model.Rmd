@@ -146,6 +146,69 @@ soilplot=function(soil,hum_depth=0.0,plots=T){
   }
 }
 
+
+
+
+# ##calculate centroid of soil texture class after P. Bourke 1988, https://lexrent.eu/wp-content/uploads/torza/artikel_groep_sub_2_docs/BYZ_3_Polygon-Area-and-Centroid.pdf
+# ##additionally: translate class centroid to another classification
+# get_centroid=function(original="AT.TT",target="AT.TT",class){
+#   ##partly adapted from https://github.com/cran/soiltexture/blob/master/R/soiltexture.R
+#   
+#   ##original system
+#   TT.data_prev=TT.get(original)
+#   poly.nm=names(TT.data_prev$"tt.polygons")
+#   xy.prev=TT.css2xy( 
+#     tri.data=TT.data_prev$tt.points*100, 
+#     geo=TT.geo.get(class.sys=original)
+#   )
+#   
+#   ##target system
+#   TT.data_target=TT.get(target)
+#   poly.nm=names(TT.data_target$"tt.polygons")
+#   xy.target=TT.css2xy( 
+#     tri.data=TT.data_target$tt.points*100, 
+#     geo=TT.geo.get(class.sys=target)
+#   )
+#   
+#   ##compute original xy position of class
+#   sel.vec_prev=(TT.data_prev$"tt.polygons"[[ class ]])$"points"
+#   cent_xy_prev=TT.polygon.centroids(
+#     pol.x=xy.prev[sel.vec_prev,"xpos"], 
+#     pol.y=xy.prev[sel.vec_prev,"ypos"] 
+#   )
+#   
+#   ##re-format for TT.xy2css
+#   xypos_prev=data.frame(t(cent_xy_prev))
+#   names(xypos_prev)=c("xpos","ypos")
+#   
+#   ##calculate centroids in terms of sand, silt and clay fraction
+#   center_prev=TT.xy2css(xy.data=xypos_prev,
+#                         geo=TT.geo.get(class.sys=original)
+#   )
+#   
+#   ##get target class
+#   class_target=TT.points.in.classes(center_prev,class.sys=target,PiC.type="t")
+#   
+#   ##compute centroid of target class
+#   sel.vec_target=(TT.data_target$"tt.polygons"[[ class_target ]])$"points"
+#   cent_xy_target=TT.polygon.centroids(
+#     pol.x=xy.target[sel.vec_target,"xpos"], 
+#     pol.y=xy.target[sel.vec_target,"ypos"] 
+#   )
+#   
+#   ##re-format for TT.xy2css
+#   xypos_target=data.frame(t(cent_xy_target))
+#   names(xypos_target)=c("xpos","ypos")
+#   
+#   ##calculate centroids in terms of sand, silt and clay fraction
+#   center_target=TT.xy2css(xy.data=xypos_target,
+#                           geo=TT.geo.get(class.sys=target)
+#   )
+#   
+#   ##return sand, silt and clay of centroid in target system
+#   return(center_target)
+# }
+
 ```
 
 
@@ -212,7 +275,8 @@ Soil profile
 
 ```{r soil,echo=T,message=F,warning=F,error=F}
 
-##import soilgrids database
+
+##import soil data
 soilgrid_profiles=readRDS(paste(soil_path,"soilgrids_profiles.rds",sep="/"))
 sites=aqp::site(soilgrid_profiles)
 profiles=aqp::horizons(soilgrid_profiles)
@@ -221,54 +285,65 @@ profiles=aqp::horizons(soilgrid_profiles)
 location=sites[sites$id==pid,]
 
 
-##take soilgrids profile
-soil=profiles[profiles$id==pid,]
-
-##modifications for LWF-Brook90
-soil["upper"]=soil$upr/100.0*-1.0
-soil["lower"]=soil$lwr/100.0*-1.0
-soil["hor_num"]=1:nrow(soil)
-
-soilplot(soil)
-
-
-
-# ##or use individual soil parameterization
-# nlayers=6 ##number of mineral soil layers
-# max_depth=-0.5#-0.2##-1##
-# soil_raw=data.table()
-# soil_raw$lower=max_depth
-# soil_loc=soil_raw[rep(seq(1,nrow(soil_raw)),nlayers)]
-# soil_loc$hor_num=1:nlayers
-# soil_loc$gravel=0.8
-# soil_loc$corg=2
-# soil_loc$topsoil=rep(c(1,0),each=(nlayers/2))
-# soil_loc$bd=1.0##1.5##2.0##
-# soil_loc$upper=seq(0,(max_depth-(soil_raw$lower/nlayers)),length.out=nlayers)
-# soil_loc$lower=c(soil_loc$upper[2:nrow(soil_loc)],max_depth)
-# soil_loc$dw=15
+# ##take soilgrids profile
+# soil=profiles[profiles$id==pid,]
 # 
-# soil_loc$clay=30
-# soil_loc$silt=50
-# soil_loc$sand=20
+# ##modifications for LWF-Brook90
+# soil["upper"]=soil$upr/100.0*-1.0
+# soil["lower"]=soil$lwr/100.0*-1.0
+# soil["hor_num"]=1:nrow(soil)
 # 
-# soil_loc=data.table(cbind(soil_loc,LWFBrook90R::hydpar_hypres(clay=soil_loc$clay,
+# soilplot(soil)
+
+
+
+##get single location
+location=sites[sites$id==pid,]
+
+##or use individual soil parameterization
+soil_raw=data.table(upper=c(0,-0.08,-0.13,-0.48),
+                    lower=c(-0.08,-0.13,-0.48,-0.73))
+soil_raw$hor_num=1:nrow(soil_raw)
+soil_raw$horizon=c("FH","Ah","Bv","Cv")
+soil_raw$gravel=c(0,0.4,0.6,0.95)
+
+##add numeric values (mean) of soil bulk density estimated in the field
+#"Class 1: very low (0.9-1.2 kg/dm3)"
+#"Class 2: low (1.2-1.4 kg/dm3)"
+#"Class 3: intermediate (1.4-1.6 kg/dm3)"
+#"Class 4: dense (1.6-1.8 kg/dm3)"
+#"Class 5: very dense (1.8-1.9 kg/dm3)"
+soil_raw$bd=c(0,1.5,1.7,1.7)
+
+##add estimation of soil organic carbon
+soil_raw$corg=c(0,5,2,0)
+
+##only for PTF after Woesten et al. 1999
+soil_raw$topsoil=c(1,1,0,0)
+
+##add sand, silt and sand content of the texture classes (required for PTF after Woesten et al. 1999)
+soil_raw$sand=c(0,7.190476,19,19)
+soil_raw$silt=c(0,72.19048,57.5,57.5)
+soil_raw$clay=c(0,20.61905,23.5,23.5)
+
+##add soil hydraulic parameters for humus layer using the PTF after Hammel and Kennel 2001
+hydpars=data.table(LWFBrook90R::hydpar_ff_b90())
+
+##add soil hydraulic parameters for mineral soil using the PTF after Woesten et al. 1999 (continuous)
+# hydpars=rbind(hydpars,data.table(LWFBrook90R::hydpar_hypres(clay=soil_loc$clay,
 #                                                               silt=soil_loc$silt,
 #                                                               bd=soil_loc$bd,
 #                                                               oc.pct=soil_loc$corg,
 #                                                               topsoil=soil_loc$topsoil)))
-# 
-# ##add humus layer
-# hum_depth=-0.1 #m
-# hum_layer=data.table(lower=hum_depth,hor_num=0,gravel=0,corg=0,topsoil=0,bd=0,upper=0,dw=0,clay=0,silt=0,sand=0,
-#                      LWFBrook90R::hydpar_ff_b90())
-# soil_loc$upper=seq(0,(max_depth-(soil_raw$lower/nlayers)),length.out=nlayers)+hum_depth
-# soil_loc$lower=c(soil_loc$upper[2:nrow(soil_loc)],max_depth+hum_depth)
-# soil_loc=rbind(hum_layer,soil_loc)
-# 
-# soil=soil_loc
-# 
-# soilplot(soil,hum_depth=hum_depth)
+
+##use PTF after Wessolek 2009
+hydpars=rbind(hydpars,hydpar_wessolek_tab(texture="Ut4"))
+hydpars=rbind(hydpars,hydpar_wessolek_tab(texture="Lu"))
+hydpars=rbind(hydpars,hydpar_wessolek_tab(texture="Lu"))
+
+soil=cbind(soil_raw,hydpars)
+
+soilplot(soil,hum_depth=soil$lower[1])
 
 
 ```
