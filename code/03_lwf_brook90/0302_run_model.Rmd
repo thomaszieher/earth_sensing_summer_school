@@ -221,11 +221,11 @@ soilplot=function(soil,hum_depth=0.0,plots=T){
 meteo_daily=data.table(read.table(paste(meteo_path,"ERA5_meteo_daily.csv",sep="/"),header=T,sep=";",stringsAsFactors=F))
 meteo_daily$dates=as.Date(meteo_daily$dates)
 
-# ##adjust meteo
-# meteo_daily$prec=meteo_daily$prec*0.5
-# meteo_daily$tmean=meteo_daily$tmean+5.0
-# meteo_daily$tmin=meteo_daily$tmin+5.0
-# meteo_daily$tmax=meteo_daily$tmax+5.0
+##adjust meteo
+meteo_daily$prec=meteo_daily$prec*0.5
+meteo_daily$tmean=meteo_daily$tmean+5.0
+meteo_daily$tmin=meteo_daily$tmin+5.0
+meteo_daily$tmax=meteo_daily$tmax+5.0
 
 
 ##Walther-Lieth diagram
@@ -276,15 +276,15 @@ Soil profile
 ```{r soil,echo=T,message=F,warning=F,error=F}
 
 
-# ##import soil data
-# soilgrid_profiles=readRDS(paste(soil_path,"soilgrids_profiles.rds",sep="/"))
-# sites=aqp::site(soilgrid_profiles)
-# profiles=aqp::horizons(soilgrid_profiles)
-# 
-# ##get single location
-# location=sites[sites$id==pid,]
-# 
-# 
+##import soil data
+soilgrid_profiles=readRDS(paste(soil_path,"soilgrids_profiles.rds",sep="/"))
+sites=aqp::site(soilgrid_profiles)
+profiles=aqp::horizons(soilgrid_profiles)
+
+##get single location
+location=sites[sites$id==pid,]
+
+
 # ##take soilgrids profile
 # soil=profiles[profiles$id==pid,]
 # 
