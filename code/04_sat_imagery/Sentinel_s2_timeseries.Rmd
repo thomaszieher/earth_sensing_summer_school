@@ -1,0 +1,76 @@
+```{r}
+# ================================
+# Katarzyna Majerska (Smoter)
+# ================================
+# install.packages(c("dplyr","lubridate","Rbeast","zoo"))
+library(dplyr)
+library(lubridate)
+library(Rbeast)
+library(zoo)
+
+# ================================
+# 1. Load Sentinel-2 data
+# ================================
+df <- read.csv("D:/SummerSchoolItaly/s2_bands_timeseries.csv", sep=";")
+df$date <- as.Date(df$date)
+
+# ================================
+# 2. Calculate indices (Sentinel-2)
+# ================================
+df <- df %>%
+  mutate(
+    NDWI = (b03 - b08) / (b03 + b08),    # Normalized Difference Water Index
+    MSI  = b11 / b08,                    # Moisture Stress Index
+    NDMI = (b08 - b11) / (b08 + b11)     # Normalized Difference Moisture Index
+  )
+
+# ================================
+# 3. Fit BEAST
+# ================================
+fit_ndwi <- beast(df$NDWI, time=df$date)
+fit_msi  <- beast(df$MSI,  time=df$date)
+fit_ndmi <- beast(df$NDMI, time=df$date)
+
+# ================================
+# 4. Individual plots (NDWI, MSI, NDMI)
+# ================================
+par(mfrow=c(3,1), mar=c(4,4,2,1))
+
+# --- NDWI
+plot(df$date, df$NDWI, col="grey", pch=16, main="NDWI (Sentinel-2)", 
+     ylab="NDWI", xlab="Date")
+lines(as.Date(fit_ndwi$time), fit_ndwi$Yhat, col="darkgreen", lwd=2)
+lines(df$date, rollmean(df$NDWI, k=5, fill=NA), col="blue", lwd=2, lty=2)
+abline(v=as.Date(fit_ndwi$cp$ts), col="red", lty=2)
+
+# --- MSI
+plot(df$date, df$MSI, col="grey", pch=16, main="MSI (Sentinel-2)", 
+     ylab="MSI", xlab="Date")
+lines(as.Date(fit_msi$time), fit_msi$Yhat, col="darkgreen", lwd=2)
+lines(df$date, rollmean(df$MSI, k=5, fill=NA), col="blue", lwd=2, lty=2)
+abline(v=as.Date(fit_msi$cp$ts), col="red", lty=2)
+
+# --- NDMI
+plot(df$date, df$NDMI, col="grey", pch=16, main="NDMI (Sentinel-2)", 
+     ylab="NDMI", xlab="Date")
+lines(as.Date(fit_ndmi$time), fit_ndmi$Yhat, col="darkgreen", lwd=2)
+lines(df$date, rollmean(df$NDMI, k=5, fill=NA), col="blue", lwd=2, lty=2)
+abline(v=as.Date(fit_ndmi$cp$ts), col="red", lty=2)
+
+# ================================
+# 5. Combined plot (NDWI, MSI, NDMI)
+# ================================
+par(mfrow=c(1,1))
+plot(df$date, df$NDWI, type="l", col="cyan4", lwd=2, 
+     ylim=c(min(df$NDWI, df$MSI, df$NDMI, na.rm=TRUE),
+            max(df$NDWI, df$MSI, df$NDMI, na.rm=TRUE)),
+     main="Spectral Indices from Sentinel-2", 
+     ylab="Index value", xlab="Date")
+
+lines(df$date, df$MSI,  col="purple", lwd=2)
+lines(df$date, df$NDMI, col="brown", lwd=2)
+
+legend("topright", legend=c("NDWI","MSI","NDMI"),
+       col=c("cyan4","purple","brown"), lwd=2)
+
+```
