@@ -1068,4 +1068,6 @@ write.table(output_pine[,c("date","tratio","tdef","relawat")],paste(model_path,s
 
 write.table(output_grass[,c("date","tratio","tdef","relawat")],paste(model_path,sprintf("wb_indices_%s_grass.csv",pid),sep="/"),sep=";",quote=F,row.names=F)
 
+write.table(mixed[,c("date","tratio","tdef","relawat")],paste(model_path,sprintf("wb_indices_%s_mixed.csv",pid),sep="/"),sep=";",quote=F,row.names=F)
+
 ```
