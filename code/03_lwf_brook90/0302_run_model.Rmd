@@ -39,7 +39,6 @@ editor_options:
 
 ```
 
-
 ```{r setup,include=FALSE}
 knitr::opts_chunk$set(echo=T)
 
@@ -149,8 +148,8 @@ soilplot=function(soil,hum_depth=0.0,plots=T){
 
 ```
 
+------------------------------------------------------------------------
 
-***
 ### Read meteo data
 
 ```{r meteo,echo=T,message=F,warning=F,error=F}
@@ -249,9 +248,10 @@ grid()
 
 ```
 
+------------------------------------------------------------------------
 
-***
 ### Parameterization
+
 General options
 
 ```{r options,echo=T,message=F,warning=F,error=F}
@@ -275,7 +275,6 @@ options_grass=set_optionsLWFB90(startdate=start_date,
                                 )
 
 ```
-
 
 Soil profile
 
@@ -332,6 +331,9 @@ soil_raw$sand=c(0,7.190476,19,19)
 soil_raw$silt=c(0,72.19048,57.5,57.5)
 soil_raw$clay=c(0,20.61905,23.5,23.5)
 
+
+# good package: library(soiltexture)
+
 ##add soil hydraulic parameters for humus layer using the PTF after Hammel and Kennel 2001
 hydpars=data.table(LWFBrook90R::hydpar_ff_b90())
 
@@ -354,7 +356,6 @@ soilplot(soil,hum_depth=soil$lower[1])
 
 ```
 
-
 Vegetation parameters
 
 ```{r vegetation,echo=T,message=F,warning=F,error=F}
@@ -362,10 +363,14 @@ Vegetation parameters
 ##load parameterizations for spruce (Picea abies), beech (Fagus sylvatica), oak (Quercus robur) and pine (Pinus sylvestris) from other project
 load(paste(model_path,"veg_param.rda",sep="/"))
 
+# average height from liDAR extracted trees (n=6)
+params_spruce$height=26 # m
+params_pine$height=26 # m
+
 ##grass parameterization taken from Schmidt-Walter et al. (2020), Supplement
 params_grass=set_paramLWFB90(maxlai=3,
                              winlaifrac=0.5,
-                             height=0.5,
+                             height=0.25,
                              sai=0,
                              glmax=0.0053,
                              radex=0.7,
@@ -426,7 +431,6 @@ params_grass=set_paramLWFB90(maxlai=3,
 
 ```
 
-
 Site specifics
 
 ```{r site,echo=T,warning=F,error=F}
@@ -486,9 +490,8 @@ params_grass$infexp=infexp
 
 ```
 
+------------------------------------------------------------------------
 
-
-***
 ### Run model
 
 ```{r model,echo=F,warning=F,error=F}
@@ -519,9 +522,10 @@ res_grass=run_LWFB90(options_b90=options_grass,
 
 ```
 
+------------------------------------------------------------------------
 
-***
 ### Plots
+
 Daily water balance components
 
 ```{r wb_daily,echo=F,message=F,warning=F,error=F}
@@ -585,8 +589,8 @@ dygraph(tseries_plot,width=600,height=400) %>%
 
 ```
 
+------------------------------------------------------------------------
 
-***
 ### Calculate indices
 
 ```{r indices,echo=F,warning=F,error=F}
@@ -656,8 +660,8 @@ smlt=xts(output_spruce$smlt[output_spruce$yr%in%unique(output_spruce$yr)],order.
 
 ```
 
+------------------------------------------------------------------------
 
-***
 ### Check soil water storage in individual soil layers
 
 ```{r swati,echo=F,warning=F,error=F}
@@ -711,10 +715,11 @@ dygraph(tseries_plot_nl,width="auto",height=400) %>%
 
 ```
 
+------------------------------------------------------------------------
 
-***
 ### Relative extractable water (REW) per DOY
-Values <Q01 are shown as point markers
+
+Values \<Q01 are shown as point markers
 
 ```{r rew_plot,echo=F,warning=F,error=F,out.width="80%",fig.width=10,fig.height=13}
 
@@ -780,10 +785,11 @@ dygraphs::dygraph(tseries_plot,width=600,height=400) %>%
 
 ```
 
+------------------------------------------------------------------------
 
-***
 ### T_def per DOY
-Values >Q99 are shown as point markers
+
+Values \>Q99 are shown as point markers
 
 ```{r tdef,echo=F,warning=F,error=F,out.width="80%",fig.width=10,fig.height=13}
 
@@ -842,10 +848,11 @@ dygraphs::dygraph(tseries_plot,width=600,height=400) %>%
 
 ```
 
+------------------------------------------------------------------------
 
-***
 ### T_ratio per DOY
-Values <Q01 are shown as point markers
+
+Values \<Q01 are shown as point markers
 
 ```{r tratio,echo=F,warning=F,error=F,out.width="80%",fig.width=10,fig.height=13}
 
@@ -911,8 +918,8 @@ dygraphs::dygraph(tseries_plot,width=600,height=400) %>%
 
 ```
 
+------------------------------------------------------------------------
 
-***
 ### Comparison of drought indicators
 
 ```{r comp,echo=F,warning=F,error=F}
@@ -955,8 +962,8 @@ legend("bottomright",legend=c("Spruce","Pine","Grass","Mixed"),lwd=2,col=cols_tr
 
 ```
 
+------------------------------------------------------------------------
 
-***
 ### Water balance: Mean monthly conditions
 
 ```{r annual,echo=F,message=F,warning=F,error=F}
@@ -1049,8 +1056,8 @@ print(p_budg)
 
 ```
 
+------------------------------------------------------------------------
 
-***
 ### Write results
 
 ```{r write,echo=F,warning=F,error=F}
@@ -1062,6 +1069,3 @@ write.table(output_pine[,c("date","tratio","tdef","relawat")],paste(model_path,s
 write.table(output_grass[,c("date","tratio","tdef","relawat")],paste(model_path,sprintf("wb_indices_%s_grass.csv",pid),sep="/"),sep=";",quote=F,row.names=F)
 
 ```
-
-
-
