@@ -1,0 +1,443 @@
+---
+title: "HLS imagery"
+author: "Thomas Zieher"
+date: "2025-09-11"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r header,include=T}
+#####################################################
+##                                                 ##
+##      ######      #########  ##          ##      ##
+##      #######     ########   ##          ##      ##
+##      ##    ##    ##         ##          ##      ##
+##      ##   ##     ##         ##          ##      ##
+##      ######      ######     ##          ##      ##
+##      #######     #####      ##          ##      ##
+##      ##    ##    ##         ##    ##    ##      ##
+##      ##     ##   ##         ##   ####   ##      ##
+##      ##     ##   ##         ##  ##  ##  ##      ##
+##      ########    ##          ####    ####       ##
+##      #######     ##           ##      ##        ##
+##                                                 ##
+#####################################################
+##                                                 ##
+##  Author: Thomas Zieher                          ##
+##  Institute: Nat Haz, 6.3                        ##
+##  Date: 2025-09-11                               ##
+##  License: GNU GPL V.3 or later                  ##
+##                                                 ##
+#####################################################
+##  Description: Preparing time series of HLS-S2 and HLS-LS
+##  Environment: renv
+#####################################################
+
+##set include=F to omit header in output
+
+```
+
+
+```{r setup,include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+##empty environment
+rm(list=ls())
+
+##install package renv
+#install.packages("renv")
+
+##install packages with respective version
+renv::snapshot()
+renv::restore()
+
+##devtools::install_github("e-sensing/sits")
+library(sits)
+library(rstac)
+library(sf)
+library(rstudioapi)
+library(aqp)
+proj_path=dirname(rstudioapi::getActiveProject())
+
+##set paths
+root=paste(proj_path,"earth_sensing_summer_school",sep="/")
+soil_path=paste(root,"data/soilgrids",sep="/")
+model_path=paste(root,"data/lwf_brook90",sep="/")
+sat_path=paste(root,"data/sat",sep="/")
+
+##set local paths
+sits_path_img="C:/Users/thomas.zieher/Documents/summer_school_2025/sits_output/imagery"
+sits_path_reg="C:/Users/thomas.zieher/Documents/summer_school_2025/sits_output/regularized"
+
+
+##read soil data
+soilgrid_profiles=readRDS(paste(soil_path,"soilgrids_profiles.rds",sep="/"))
+##get sites
+sites_raw=aqp::site(soilgrid_profiles)
+sites_wgs84=sf::st_as_sf(sites_raw)
+
+
+##check available data on MPC: https://planetarycomputer.microsoft.com/dataset/landsat-c2-l2
+sits_list_collections("MPC")
+
+##MPC STAC endpoint
+stac_url="https://planetarycomputer.microsoft.com/api/stac/v1"
+
+##set period, aoi, crs and spatial resolution
+start_date="2019-01-01"
+end_date="2024-12-31"
+crs_def="32632" #UTM 33N
+left=282000 #m
+right=289000 #m
+bottom=5145000 #m
+top=5152000 #m
+
+timezone="Etc/GMT-1"
+
+
+##create aoi sf
+aoi=sf::st_as_sf(sf::st_sfc(sf::st_polygon(x=list(matrix(c(left,bottom,left,top,right,top,right,bottom,left,bottom),ncol=2,byrow=T))),
+                            crs=sprintf("EPSG:%s",crs_def)))
+aoi_wgs84=sf::st_transform(aoi,crs="EPSG:4326")
+
+
+##set tree species of model results
+tree_species="pine"#"oak"#
+##select pid
+pid="P1"#"P2"#"P3"#"P4"#
+
+```
+
+
+***
+### Build a cube with satellite data
+A local copy of the cube is produced, this can take long...
+
+```{r ls_cube,echo=F,warning=F,error=F}
+
+# hlss30=sits::sits_cube(source="MPC",
+#                        collection="HLSS30",
+#                        #bands=c("BLUE","GREEN","RED","NIR08","SWIR16","SWIR22","CLOUD"),
+#                        roi=aoi_wgs84,
+#                        start_date=start_date,
+#                        end_date=end_date,
+#                        progress=F
+#                        )
+# 
+# hlsl30=sits::sits_cube(source="MPC",
+#                        collection="HLSL30",
+#                        #bands=c("BLUE","GREEN","RED","NIR08","SWIR16","SWIR22","CLOUD"),
+#                        roi=aoi_wgs84,
+#                        start_date=start_date,
+#                        end_date=end_date,
+#                        progress=F
+#                        )
+# 
+# #quick visualization
+# plot(hlss30)
+# plot(hlsl30)
+# 
+# ##copy locally
+# cube_hlss30=sits::sits_cube_copy(hlss30,
+#                                  roi=aoi_wgs84,
+#                                  output_dir=sits_path_img,
+#                                  progress=F
+#                                  )
+# 
+# cube_hlsl30=sits::sits_cube_copy(hlsl30,
+#                                  roi=aoi_wgs84,
+#                                  output_dir=sits_path_img,
+#                                  progress=F
+#                                  )
+
+
+# ##S-2 bands
+# # Description   Standard	Spectral Range (nm)   Sentinel-2
+# # Aerosols      A         400 - 455             B01
+# # Blue          B         450 - 530             B02
+# # Green         G         510 - 600             B03
+# # Red           R         620 - 690             B04
+# # Red Edge 1	  RE1       695 - 715             B05
+# # Red Edge 2	  RE2       730 - 750             B06
+# # Red Edge 3	  RE3       765 - 795             B07
+# # NIR           N         760 - 900             B08
+# # NIR 2         N2        850 - 880             B8A
+# # Water Vapour  WV        930 - 960             B09
+# # SWIR 1        S1        1550 - 1750           B11
+# # SWIR 2        S2        2080 - 2350           B12
+
+##prepare stack of downloaded files
+hlss30_b01_files=list.files(sits_path_img,pattern="MSI_32TQS_COASTAL-AEROSOL_",full.names=T)
+hlss30_b02_files=list.files(sits_path_img,pattern="MSI_32TQS_BLUE_",full.names=T)
+hlss30_b03_files=list.files(sits_path_img,pattern="MSI_32TQS_GREEN_",full.names=T)
+hlss30_b04_files=list.files(sits_path_img,pattern="MSI_32TQS_RED_",full.names=T)
+hlss30_b05_files=list.files(sits_path_img,pattern="MSI_32TQS_RED-EDGE-1_",full.names=T)
+hlss30_b06_files=list.files(sits_path_img,pattern="MSI_32TQS_RED-EDGE-2_",full.names=T)
+hlss30_b07_files=list.files(sits_path_img,pattern="MSI_32TQS_RED-EDGE-3_",full.names=T)
+hlss30_b08_files=list.files(sits_path_img,pattern="MSI_32TQS_NIR-BROAD_",full.names=T)
+hlss30_b08a_files=list.files(sits_path_img,pattern="MSI_32TQS_NIR-NARROW_",full.names=T)
+hlss30_b09_files=list.files(sits_path_img,pattern="MSI_32TQS_WATER-VAPOR_",full.names=T)
+hlss30_b11_files=list.files(sits_path_img,pattern="MSI_32TQS_SWIR-1_",full.names=T)
+hlss30_b12_files=list.files(sits_path_img,pattern="MSI_32TQS_SWIR-2_",full.names=T)
+hlss30_b13_files=list.files(sits_path_img,pattern="MSI_32TQS_CLOUD_",full.names=T)
+
+dates_b01=as.POSIXct(substr(hlss30_b01_files,start=(nchar(hlss30_b01_files)-13),stop=(nchar(hlss30_b01_files)-4)),tz=timezone)
+dates_b02=as.POSIXct(substr(hlss30_b02_files,start=(nchar(hlss30_b02_files)-13),stop=(nchar(hlss30_b02_files)-4)),tz=timezone)
+dates_b03=as.POSIXct(substr(hlss30_b03_files,start=(nchar(hlss30_b03_files)-13),stop=(nchar(hlss30_b03_files)-4)),tz=timezone)
+dates_b04=as.POSIXct(substr(hlss30_b04_files,start=(nchar(hlss30_b04_files)-13),stop=(nchar(hlss30_b04_files)-4)),tz=timezone)
+dates_b05=as.POSIXct(substr(hlss30_b05_files,start=(nchar(hlss30_b05_files)-13),stop=(nchar(hlss30_b05_files)-4)),tz=timezone)
+dates_b06=as.POSIXct(substr(hlss30_b06_files,start=(nchar(hlss30_b06_files)-13),stop=(nchar(hlss30_b06_files)-4)),tz=timezone)
+dates_b07=as.POSIXct(substr(hlss30_b07_files,start=(nchar(hlss30_b07_files)-13),stop=(nchar(hlss30_b07_files)-4)),tz=timezone)
+dates_b08=as.POSIXct(substr(hlss30_b08_files,start=(nchar(hlss30_b08_files)-13),stop=(nchar(hlss30_b08_files)-4)),tz=timezone)
+dates_b08a=as.POSIXct(substr(hlss30_b08a_files,start=(nchar(hlss30_b08a_files)-13),stop=(nchar(hlss30_b08a_files)-4)),tz=timezone)
+dates_b09=as.POSIXct(substr(hlss30_b09_files,start=(nchar(hlss30_b09_files)-13),stop=(nchar(hlss30_b09_files)-4)),tz=timezone)
+dates_b11=as.POSIXct(substr(hlss30_b11_files,start=(nchar(hlss30_b11_files)-13),stop=(nchar(hlss30_b11_files)-4)),tz=timezone)
+dates_b12=as.POSIXct(substr(hlss30_b12_files,start=(nchar(hlss30_b12_files)-13),stop=(nchar(hlss30_b12_files)-4)),tz=timezone)
+dates_b13=as.POSIXct(substr(hlss30_b13_files,start=(nchar(hlss30_b13_files)-13),stop=(nchar(hlss30_b13_files)-4)),tz=timezone)
+
+
+hlss30_b01=terra::rast(hlss30_b01_files)
+names(hlss30_b01)=dates_b01
+terra::crs(hlss30_b01)="EPSG:32632"
+hlss30_b02=terra::rast(hlss30_b02_files)
+names(hlss30_b02)=dates_b02
+terra::crs(hlss30_b02)="EPSG:32632"
+hlss30_b03=terra::rast(hlss30_b03_files)
+names(hlss30_b03)=dates_b03
+terra::crs(hlss30_b03)="EPSG:32632"
+hlss30_b04=terra::rast(hlss30_b04_files)
+names(hlss30_b04)=dates_b04
+terra::crs(hlss30_b04)="EPSG:32632"
+hlss30_b05=terra::rast(hlss30_b05_files)
+names(hlss30_b05)=dates_b05
+terra::crs(hlss30_b05)="EPSG:32632"
+hlss30_b06=terra::rast(hlss30_b06_files)
+names(hlss30_b06)=dates_b06
+terra::crs(hlss30_b06)="EPSG:32632"
+hlss30_b07=terra::rast(hlss30_b07_files)
+names(hlss30_b07)=dates_b07
+terra::crs(hlss30_b07)="EPSG:32632"
+hlss30_b08=terra::rast(hlss30_b08_files)
+names(hlss30_b08)=dates_b08
+terra::crs(hlss30_b08)="EPSG:32632"
+hlss30_b08a=terra::rast(hlss30_b08a_files)
+names(hlss30_b08a)=dates_b08a
+terra::crs(hlss30_b08a)="EPSG:32632"
+hlss30_b09=terra::rast(hlss30_b09_files)
+names(hlss30_b09)=dates_b09
+terra::crs(hlss30_b09)="EPSG:32632"
+hlss30_b11=terra::rast(hlss30_b11_files)
+names(hlss30_b11)=dates_b11
+terra::crs(hlss30_b11)="EPSG:32632"
+hlss30_b12=terra::rast(hlss30_b12_files)
+names(hlss30_b12)=dates_b12
+terra::crs(hlss30_b12)="EPSG:32632"
+hlss30_b13=terra::rast(hlss30_b13_files)
+names(hlss30_b13)=dates_b13
+terra::crs(hlss30_b13)="EPSG:32632"
+
+
+
+##prepare stack of downloaded files
+hlsl30_b01_files=list.files(sits_path_img,pattern="OLI_32TQS_COASTAL-AEROSOL_",full.names=T)
+hlsl30_b02_files=list.files(sits_path_img,pattern="OLI_32TQS_BLUE_",full.names=T)
+hlsl30_b03_files=list.files(sits_path_img,pattern="OLI_32TQS_GREEN_",full.names=T)
+hlsl30_b04_files=list.files(sits_path_img,pattern="OLI_32TQS_RED_",full.names=T)
+hlsl30_b05_files=list.files(sits_path_img,pattern="OLI_32TQS_NIR-NARROW_",full.names=T)
+hlsl30_b06_files=list.files(sits_path_img,pattern="OLI_32TQS_SWIR-1_",full.names=T)
+hlsl30_b07_files=list.files(sits_path_img,pattern="OLI_32TQS_SWIR-2_",full.names=T)
+hlsl30_b08_files=list.files(sits_path_img,pattern="OLI_32TQS_CLOUD_",full.names=T)
+
+dates_b01=as.POSIXct(substr(hlsl30_b01_files,start=(nchar(hlsl30_b01_files)-13),stop=(nchar(hlsl30_b01_files)-4)),tz=timezone)
+dates_b02=as.POSIXct(substr(hlsl30_b02_files,start=(nchar(hlsl30_b02_files)-13),stop=(nchar(hlsl30_b02_files)-4)),tz=timezone)
+dates_b03=as.POSIXct(substr(hlsl30_b03_files,start=(nchar(hlsl30_b03_files)-13),stop=(nchar(hlsl30_b03_files)-4)),tz=timezone)
+dates_b04=as.POSIXct(substr(hlsl30_b04_files,start=(nchar(hlsl30_b04_files)-13),stop=(nchar(hlsl30_b04_files)-4)),tz=timezone)
+dates_b05=as.POSIXct(substr(hlsl30_b05_files,start=(nchar(hlsl30_b05_files)-13),stop=(nchar(hlsl30_b05_files)-4)),tz=timezone)
+dates_b06=as.POSIXct(substr(hlsl30_b06_files,start=(nchar(hlsl30_b06_files)-13),stop=(nchar(hlsl30_b06_files)-4)),tz=timezone)
+dates_b07=as.POSIXct(substr(hlsl30_b07_files,start=(nchar(hlsl30_b07_files)-13),stop=(nchar(hlsl30_b07_files)-4)),tz=timezone)
+dates_b08=as.POSIXct(substr(hlsl30_b08_files,start=(nchar(hlsl30_b08_files)-13),stop=(nchar(hlsl30_b08_files)-4)),tz=timezone)
+
+
+hlsl30_b01=terra::rast(hlsl30_b01_files)
+names(hlsl30_b01)=dates_b01
+terra::crs(hlsl30_b01)="EPSG:32632"
+hlsl30_b02=terra::rast(hlsl30_b02_files)
+names(hlsl30_b02)=dates_b02
+terra::crs(hlsl30_b02)="EPSG:32632"
+hlsl30_b03=terra::rast(hlsl30_b03_files)
+names(hlsl30_b03)=dates_b03
+terra::crs(hlsl30_b03)="EPSG:32632"
+hlsl30_b04=terra::rast(hlsl30_b04_files)
+names(hlsl30_b04)=dates_b04
+terra::crs(hlsl30_b04)="EPSG:32632"
+hlsl30_b05=terra::rast(hlsl30_b05_files)
+names(hlsl30_b05)=dates_b05
+terra::crs(hlsl30_b05)="EPSG:32632"
+hlsl30_b06=terra::rast(hlsl30_b06_files)
+names(hlsl30_b06)=dates_b06
+terra::crs(hlsl30_b06)="EPSG:32632"
+hlsl30_b07=terra::rast(hlsl30_b07_files)
+names(hlsl30_b07)=dates_b07
+terra::crs(hlsl30_b07)="EPSG:32632"
+hlsl30_b08=terra::rast(hlsl30_b08_files)
+names(hlsl30_b08)=dates_b08
+terra::crs(hlsl30_b08)="EPSG:32632"
+
+
+```
+
+
+***
+## Extract time series
+
+```{r ls_ts,echo=F,warning=F,error=F}
+
+##prepare points
+sites_wgs84["label"]=sites_wgs84$id
+pt=sites_wgs84[sites_wgs84$id=="P1",]
+pt_utm=sf::st_transform(pt,"EPSG:32632")
+
+plot(hlss30_b01[[1]])
+points(sf::st_geometry(pt_utm))
+
+
+# ##S-2 bands
+s2_aerosols=data.frame(aerosols=t(terra::extract(hlss30_b01,pt_utm)))
+s2_aerosols["date"]=row.names(s2_aerosols)
+s2_aerosols=s2_aerosols[-1,]
+
+s2_blue=data.frame(blue=t(terra::extract(hlss30_b02,pt_utm)))
+s2_blue["date"]=row.names(s2_blue)
+s2_blue=s2_blue[-1,]
+
+s2_green=data.frame(green=t(terra::extract(hlss30_b03,pt_utm)))
+s2_green["date"]=row.names(s2_green)
+s2_green=s2_green[-1,]
+
+s2_red=data.frame(red=t(terra::extract(hlss30_b04,pt_utm)))
+s2_red["date"]=row.names(s2_red)
+s2_red=s2_red[-1,]
+
+s2_re1=data.frame(re1=t(terra::extract(hlss30_b05,pt_utm)))
+s2_re1["date"]=row.names(s2_re1)
+s2_re1=s2_re1[-1,]
+
+s2_re2=data.frame(re2=t(terra::extract(hlss30_b06,pt_utm)))
+s2_re2["date"]=row.names(s2_re2)
+s2_re2=s2_re2[-1,]
+
+s2_re3=data.frame(re3=t(terra::extract(hlss30_b07,pt_utm)))
+s2_re3["date"]=row.names(s2_re3)
+s2_re3=s2_re3[-1,]
+
+s2_nir=data.frame(nir=t(terra::extract(hlss30_b08,pt_utm)))
+s2_nir["date"]=row.names(s2_nir)
+s2_nir=s2_nir[-1,]
+
+s2_nir2=data.frame(nir2=t(terra::extract(hlss30_b08a,pt_utm)))
+s2_nir2["date"]=row.names(s2_nir2)
+s2_nir2=s2_nir2[-1,]
+
+s2_watervapor=data.frame(watervapor=t(terra::extract(hlss30_b09,pt_utm)))
+s2_watervapor["date"]=row.names(s2_watervapor)
+s2_watervapor=s2_watervapor[-1,]
+
+s2_swir1=data.frame(swir1=t(terra::extract(hlss30_b11,pt_utm)))
+s2_swir1["date"]=row.names(s2_swir1)
+s2_swir1=s2_swir1[-1,]
+
+s2_swir2=data.frame(swir2=t(terra::extract(hlss30_b12,pt_utm)))
+s2_swir2["date"]=row.names(s2_swir2)
+s2_swir2=s2_swir2[-1,]
+
+s2_cloud=data.frame(cloud=t(terra::extract(hlss30_b13,pt_utm)))
+s2_cloud["date"]=row.names(s2_cloud)
+s2_cloud=s2_cloud[-1,]
+
+
+
+s2_ts=data.frame(date=s2_aerosols$date,
+                 aerosols=s2_aerosols$aerosols)
+s2_ts=merge(s2_ts,s2_blue,by.x="date",by.y="date",all.x=T)
+s2_ts=merge(s2_ts,s2_green,by.x="date",by.y="date",all.x=T)
+s2_ts=merge(s2_ts,s2_red,by.x="date",by.y="date",all.x=T)
+s2_ts=merge(s2_ts,s2_re1,by.x="date",by.y="date",all.x=T)
+s2_ts=merge(s2_ts,s2_re2,by.x="date",by.y="date",all.x=T)
+s2_ts=merge(s2_ts,s2_re3,by.x="date",by.y="date",all.x=T)
+s2_ts=merge(s2_ts,s2_nir,by.x="date",by.y="date",all.x=T)
+s2_ts=merge(s2_ts,s2_nir2,by.x="date",by.y="date",all.x=T)
+s2_ts=merge(s2_ts,s2_watervapor,by.x="date",by.y="date",all.x=T)
+s2_ts=merge(s2_ts,s2_swir1,by.x="date",by.y="date",all.x=T)
+s2_ts=merge(s2_ts,s2_swir2,by.x="date",by.y="date",all.x=T)
+s2_ts=merge(s2_ts,s2_cloud,by.x="date",by.y="date",all.x=T)
+s2_ts["sat"]="s2"
+
+s2_ts$date=as.Date(s2_ts$date)
+plot(s2_ts$date,s2_ts$swir1,ylim=c(0,1))
+
+
+##ls bands
+ls_aerosols=data.frame(aerosols=t(terra::extract(hlsl30_b01,pt_utm)))
+ls_aerosols["date"]=row.names(ls_aerosols)
+ls_aerosols=ls_aerosols[-1,]
+
+ls_blue=data.frame(blue=t(terra::extract(hlsl30_b02,pt_utm)))
+ls_blue["date"]=row.names(ls_blue)
+ls_blue=ls_blue[-1,]
+
+ls_green=data.frame(green=t(terra::extract(hlsl30_b03,pt_utm)))
+ls_green["date"]=row.names(ls_green)
+ls_green=ls_green[-1,]
+
+ls_red=data.frame(red=t(terra::extract(hlsl30_b04,pt_utm)))
+ls_red["date"]=row.names(ls_red)
+ls_red=ls_red[-1,]
+
+ls_nir=data.frame(nir=t(terra::extract(hlsl30_b05,pt_utm)))
+ls_nir["date"]=row.names(ls_nir)
+ls_nir=ls_nir[-1,]
+
+ls_swir1=data.frame(swir1=t(terra::extract(hlsl30_b06,pt_utm)))
+ls_swir1["date"]=row.names(ls_swir1)
+ls_swir1=ls_swir1[-1,]
+
+ls_swir2=data.frame(swir2=t(terra::extract(hlsl30_b07,pt_utm)))
+ls_swir2["date"]=row.names(ls_swir2)
+ls_swir2=ls_swir2[-1,]
+
+ls_cloud=data.frame(cloud=t(terra::extract(hlsl30_b08,pt_utm)))
+ls_cloud["date"]=row.names(ls_cloud)
+ls_cloud=ls_cloud[-1,]
+
+
+
+ls_ts=data.frame(date=ls_aerosols$date,
+                 aerosols=ls_aerosols$aerosols)
+ls_ts=merge(ls_ts,ls_blue,by.x="date",by.y="date",all.x=T)
+ls_ts=merge(ls_ts,ls_green,by.x="date",by.y="date",all.x=T)
+ls_ts=merge(ls_ts,ls_red,by.x="date",by.y="date",all.x=T)
+ls_ts["re1"]=NA
+ls_ts["re2"]=NA
+ls_ts["re3"]=NA
+ls_ts=merge(ls_ts,ls_nir,by.x="date",by.y="date",all.x=T)
+ls_ts["nir2"]=NA
+ls_ts["watervapor"]=NA
+ls_ts=merge(ls_ts,ls_swir1,by.x="date",by.y="date",all.x=T)
+ls_ts=merge(ls_ts,ls_swir2,by.x="date",by.y="date",all.x=T)
+ls_ts=merge(ls_ts,ls_cloud,by.x="date",by.y="date",all.x=T)
+ls_ts["sat"]="ls"
+
+ls_ts$date=as.Date(ls_ts$date)
+plot(ls_ts$date,ls_ts$swir1,ylim=c(0,1))
+
+
+fused_ts=rbind(s2_ts,ls_ts)
+fused_ts$date=as.Date(fused_ts$date)
+
+plot(fused_ts$date,fused_ts$swir1,ylim=c(0,1))
+
+
+write.table(fused_ts,paste(sat_path,"hls_bands_timeseries.csv",sep="/"),sep=";",row.names=F,quote=F)
+
+```
