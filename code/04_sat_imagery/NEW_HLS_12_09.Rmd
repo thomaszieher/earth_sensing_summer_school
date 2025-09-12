@@ -1,0 +1,155 @@
+---
+title: "HLS_ Katarzyna_Majerska_Smoter"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r}
+#install.packages("readr")
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+
+# wczytaj dane
+# dane <- read_csv("D:/SummerSchoolItaly/earth_sensing_summer_school/data/sat/s2_bands_timeseries.csv")
+
+
+dane <- read_delim(
+  "D:/SummerSchoolItaly/earth_sensing_summer_school/data/sat/hls_bands_timeseries.csv",
+  delim = ";",      # separator = średnik
+  locale = locale(decimal_mark = ",")  # jeśli liczby mają przecinek zamiast kropki
+)
+
+names(dane)
+
+# Konwersja pasm na liczby
+dane <- dane %>%
+  mutate(across(c(blue, green, red, re1, re2, re3, nir, nir2, watervapor, swir1, swir2),
+                ~ as.numeric(gsub(",", ".", .))))
+
+# podejrzyj
+#head(dane)
+
+# dane <- dane %>%
+#   mutate(across(gr:b12, ~ as.numeric(gsub(",", ".", .))))
+
+
+
+
+
+dane <- dane %>%
+  mutate(
+    NDWI = (green - nir) / (green + nir),
+    MSI  = swir1/ nir,
+    NDMI = (nir - swir1) / (nir + swir1)
+  )
+
+
+plot(dane$date,dane$nir,ylim=c(0,1),col=dane$cloud)
+
+# przekształcenie danych do formatu long
+dane_long <- dane %>%
+  select(date, NDWI, MSI, NDMI) %>%
+  pivot_longer(cols = c(NDWI, MSI, NDMI),
+               names_to = "indeks",
+               values_to = "wartosc")
+
+# wykres
+# ggplot(dane_long, aes(x = date, y = wartosc, color = indeks, group = indeks)) +
+#   geom_line(size = 1) +
+#   geom_point() +
+#   theme_minimal() +
+#   labs(title = "Zmiana wskaźników NDWI, MSI, NDMI w czasie",
+#        x = "Data",
+#        y = "Wartość",
+#        color = "Indeks") +
+#   theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+# Plot with panels stacked vertically
+
+ggplot(dane_long, aes(x = date, y = wartosc)) +
+  geom_line(aes(color = indeks), size = 1) +
+  geom_point(aes(color = indeks)) +
+  geom_smooth(method = "loess", se = FALSE, span = 0.3, color = "black") +
+  facet_wrap(~ indeks, scales = "free_y", ncol = 1) +
+  theme_minimal() +
+  labs(
+    title = "Time series of NDWI, MSI, NDMI",
+    x = "Date",
+    y = "Value"
+  ) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "none"
+  )
+
+
+# Filtrowanie po zachmurzeniu
+dane_filtered <- dane %>%
+  #filter(!(cloud==194 | cloud==130))%>%
+  filter((cloud<194))%>%
+  filter(nir<= 0.3) %>%
+  filter (NDWI > -30)# tylko wiersze, gdzie NIR <= 0.3
+
+# Przekształcenie do formatu long
+dane_long_filtered <- dane_filtered %>%
+  select(date, NDWI, MSI, NDMI) %>%
+  pivot_longer(cols = c(NDWI, MSI, NDMI),
+               names_to = "indeks",
+               values_to = "wartosc")
+
+
+# Filtrowanie po zachmurzeniu
+dane_filtered2 <- dane %>%
+  filter(!(cloud==194 | cloud==130))%>%
+  #filter((cloud<194))%>%
+  filter(nir<= 0.3) %>%
+  filter (NDWI > -30)# tylko wiersze, gdzie NIR <= 0.3
+
+# Przekształcenie do formatu long
+dane_long_filtered2 <- dane_filtered2 %>%
+  select(date, NDWI, MSI, NDMI) %>%
+  pivot_longer(cols = c(NDWI, MSI, NDMI),
+               names_to = "indeks",
+               values_to = "wartosc")
+
+
+
+plot(dane_filtered$date,dane_filtered$nir,col=dane_filtered$cloud)
+plot(dane_filtered2$date,dane_filtered2$nir,col=dane_filtered2$cloud)
+
+ggplot(dane_filtered, aes(x = date, y = nir)) +
+  geom_point(aes(color = factor(cloud))) +  # kolory według chmur
+  geom_smooth(method = "loess", span = 0.3, color = "red", se = FALSE) +  # wygładzona krzywa
+  theme_minimal() +
+  labs(title = "NIR w czasie z wygładzoną krzywą",
+       x = "Data", y = "NIR", color = "Cloud")
+
+
+ggplot(dane_filtered2, aes(x = date, y = nir)) +
+  geom_point(aes(color = factor(cloud))) +  # kolory według chmur
+  geom_smooth(method = "loess", span = 0.3, color = "red", se = FALSE) +  # wygładzona krzywa
+  theme_minimal() +
+  labs(title = "NIR w czasie z wygładzoną krzywą",
+       x = "Data", y = "NIR", color = "Cloud")
+
+
+# Wykres z panelami jeden pod drugim
+ggplot(dane_long_filtered, aes(x = date, y = wartosc)) +
+  geom_line(aes(color = indeks), size = 1) +
+  geom_point(aes(color = indeks)) +
+  geom_smooth(method = "loess", se = FALSE, span = 0.3, color = "black") +
+  facet_wrap(~ indeks, scales = "free_y", ncol = 1) +
+  theme_minimal() +
+  labs(title = "Serie czasowe wskaźników (NIR <= 0.3, NDWI > -30)",
+       x = "Data",
+       y = "Wartość") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position = "none")
+
+
+```
+
