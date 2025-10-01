@@ -1,6 +1,6 @@
 ---
 title: "Landsat imagery"
-author: "Thomas Zieher"
+author: "T. Zieher, P. Steffen, D. Teh, K. Smoter, E. Sobiech, R. Schwarz, M. Digiulio, Y. Xiao, E. Magazzino"
 date: "2025-08-20"
 output: html_document
 editor_options: 
@@ -24,8 +24,10 @@ editor_options:
 ##                                                 ##
 #####################################################
 ##                                                 ##
-##  Author: Thomas Zieher                          ##
-##  Institute: Nat Haz, 6.3                        ##
+##  Authors: T. Zieher, P. Steffen, D. Teh         ##
+##           K. Smoter, E. Sobiech, R. Schwarz,    ##
+##           M. Digiulio, Y. Xiao, E. Magazzino    ##
+##  Institute (first): Nat Haz, 6.3                ##
 ##  Date: 2025-08-20                               ##
 ##  License: GNU GPL V.3 or later                  ##
 ##                                                 ##

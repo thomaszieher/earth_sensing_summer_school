@@ -1,5 +1,5 @@
 ---
-title: "Remote LWF-Brook90 run"
+title: "LWF-Brook90 run"
 author: "Thomas Zieher"
 date: "2025-06-04"
 output: html_document
@@ -24,8 +24,10 @@ editor_options:
 ##                                                 ##
 #####################################################
 ##                                                 ##
-##  Author: Thomas Zieher                          ##
-##  Institute: Nat Haz, 6.3                        ##
+##  Authors: T. Zieher, P. Steffen, D. Teh         ##
+##           K. Smoter, E. Sobiech, R. Schwarz,    ##
+##           M. Digiulio, Y. Xiao, E. Magazzino    ##
+##  Institute (first): Nat Haz, 6.3                ##
 ##  Date: 2025-05-28                               ##
 ##  License: GNU GPL V.3 or later                  ##
 ##                                                 ##

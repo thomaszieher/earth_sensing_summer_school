@@ -1,0 +1,316 @@
+---
+title: "Sentinel-1 time series"
+author: "T. Zieher, P. Steffen, D. Teh, K. Smoter, E. Sobiech, R. Schwarz, M. Digiulio, Y. Xiao, E. Magazzino"
+date: "2025-08-20"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r header,include=T}
+#####################################################
+##                                                 ##
+##      ######      #########  ##          ##      ##
+##      #######     ########   ##          ##      ##
+##      ##    ##    ##         ##          ##      ##
+##      ##   ##     ##         ##          ##      ##
+##      ######      ######     ##          ##      ##
+##      #######     #####      ##          ##      ##
+##      ##    ##    ##         ##    ##    ##      ##
+##      ##     ##   ##         ##   ####   ##      ##
+##      ##     ##   ##         ##  ##  ##  ##      ##
+##      ########    ##          ####    ####       ##
+##      #######     ##           ##      ##        ##
+##                                                 ##
+#####################################################
+##                                                 ##
+##  Authors: T. Zieher, P. Steffen, D. Teh         ##
+##           K. Smoter, E. Sobiech, R. Schwarz,    ##
+##           M. Digiulio, Y. Xiao, E. Magazzino    ##
+##  Institute (first): Nat Haz, 6.3                ##
+##  Date: 2025-08-20                               ##
+##  License: GNU GPL V.3 or later                  ##
+##                                                 ##
+#####################################################
+##  Description: Processing of S1 time series for time series analyses
+##  Environment: renv
+#####################################################
+
+##set include=F to omit header in output
+
+```
+
+
+```{r setup,include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+##empty environment
+rm(list=ls())
+
+##install package renv
+#install.packages("renv")
+
+##install packages with respective version
+renv::snapshot()
+renv::restore()
+
+##devtools::install_github("e-sensing/sits")
+library(sits)
+library(rstac)
+library(sf)
+library(rstudioapi)
+library(aqp)
+library(Rbeast)
+library(purrr)
+library(terra)
+proj_path=dirname(rstudioapi::getActiveProject())
+
+##set paths
+root=paste(proj_path,"earth_sensing_summer_school",sep="/")
+soil_path=paste(root,"data/soilgrids",sep="/")
+model_path=paste(root,"data/lwf_brook90",sep="/")
+
+##set local paths
+sits_path_img="D:/sits_output/imagery/sentinel1"
+
+
+##read soil data
+soilgrid_profiles=readRDS(paste(soil_path,"soilgrids_profiles.rds",sep="/"))
+##get sites
+sites_raw=aqp::site(soilgrid_profiles)
+sites_wgs84=sf::st_as_sf(sites_raw)
+
+
+##check available cloud collections
+sits_list_collections(source=NULL)
+
+##check available data on MPC: https://planetarycomputer.microsoft.com/dataset/landsat-c2-l2
+sits_list_collections("MPC")
+
+##MPC STAC endpoint
+stac_url="https://planetarycomputer.microsoft.com/api/stac/v1"
+
+##set time zone, period, aoi, crs
+timezone="UTC"#"Etc/GMT-1"#
+start_date="2014-01-01"
+end_date="2024-12-31"
+crs_def="32633" #UTM 33N
+left=282000 #m
+right=289000 #m
+bottom=5145000 #m
+top=5152000 #m
+
+
+
+##create aoi sf
+aoi=sf::st_as_sf(sf::st_sfc(sf::st_polygon(x=list(matrix(c(left,bottom,left,top,right,top,right,bottom,left,bottom),ncol=2,byrow=T))),
+                            crs=sprintf("EPSG:%s",crs_def)))
+aoi_wgs84=sf::st_transform(aoi,crs="EPSG:4326")
+#sf::write_sf(aoi_wgs84,"D:/aoi_wgs84.gpkg")
+
+
+##set tree species of model results
+tree_species="pine"#"oak"#
+##select pid
+pid="P1"#"P2"#"P3"#
+
+##prepare point
+sites_wgs84["label"]=sites_wgs84$id
+pt=sites_wgs84[sites_wgs84$id=="P1",]
+pt_utm=sf::st_transform(pt,"EPSG:32632")
+pt_buffer=sf::st_buffer(pt_utm,50)
+
+```
+
+
+***
+### Build a cube with s1 data
+A local copy of the cube is produced, this can take long...
+
+```{r ls_cube,echo=F,warning=F,error=F}
+
+##download data
+s1_mpc=sits::sits_cube(source="MPC",
+                       collection="SENTINEL-1-RTC",
+                       roi=aoi,#aoi_wgs84,
+                       start_date=start_date,
+                       end_date=end_date,
+                       progress=F
+                       )
+
+#quick visualization
+#plot(s1_mpc)
+
+##copy locally
+cube_local=sits::sits_cube_copy(s1_mpc,
+                                roi=aoi,#aoi_wgs84,
+                                output_dir=sits_path_img,
+                                progress=F
+                                )
+
+
+##prepare stack of downloaded files
+s1_vh_files=list.files(sits_path_img,pattern="SENTINEL-1_C-band-SAR_NoTilingSystem-._VH_")
+s1_vv_files=list.files(sits_path_img,pattern="SENTINEL-1_C-band-SAR_NoTilingSystem-._VV_")
+
+dates_vh=as.POSIXct(substr(s1_vh_files,start=(nchar(s1_vh_files)-13),stop=(nchar(s1_vh_files)-4)),tz=timezone)
+dates_vv=as.POSIXct(substr(s1_vv_files,start=(nchar(s1_vv_files)-13),stop=(nchar(s1_vv_files)-4)),tz=timezone)
+
+
+# ##bring to same extent
+# out_files_vh=paste(sits_path_img,"crop",s1_vh_files,sep="/")
+# out_files_vv=paste(sits_path_img,"crop",s1_vv_files,sep="/")
+# 
+# ##smaller extent around the point
+# ext=sf::st_bbox(pt_buffer)
+# 
+# 
+# for (i in 1:length(s1_vh_files)) {
+#   print(s1_vh_files[i])
+#   b=terra::rast(paste(sits_path_img,s1_vh_files[i],sep="/"))
+#   b_cropped=terra::crop(b,ext)#aoi)
+#   terra::writeRaster(b_cropped,out_files_vh[i],overwrite=T)
+# }
+# 
+# for (i in 1:length(s1_vv_files)) {
+#   print(s1_vv_files[i])
+#   b=terra::rast(paste(sits_path_img,s1_vv_files[i],sep="/"))
+#   b_cropped=terra::crop(b,aoi)
+#   terra::writeRaster(b_cropped,out_files_vv[i],overwrite=T)
+# }
+# 
+# s1_vh_files_cropped=list.files(paste(sits_path_img,"crop",sep="/"),pattern="SENTINEL-1_C-band-SAR_NoTilingSystem-._VH_",full.names=T)
+# s1_vv_files_cropped=list.files(paste(sits_path_img,"crop",sep="/"),pattern="SENTINEL-1_C-band-SAR_NoTilingSystem-._VV_",full.names=T)
+
+s1_vh=terra::rast(s1_vh_files)
+names(s1_vh)=dates_vh
+terra::crs(s1_vh)=sprintf("EPSG:%s",crs_def)
+s1_vv=terra::rast(s1_vv_files)
+names(s1_vv)=dates_vv
+terra::crs(s1_vv)=sprintf("EPSG:%s",crs_def)
+
+
+```
+
+
+
+***
+### Get time series
+
+```{r ts,echo=F,warning=F,error=F}
+
+##test plot
+# plot(s1_vv[[2]])
+# points(sf::st_geometry(pt_utm),cex=1,pch=20,col="yellow")
+# plot(sf::st_geometry(pt_buffer),border="yellow",add=T)
+
+##S1 bands
+#s1_vh_ts=data.frame(s1_vh=t(terra::extract(s1_vh,pt_utm)))
+s1_vh_ts=data.frame(s1_vh=t(terra::extract(s1_vh,pt_buffer)))
+s1_vh_ts["date"]=row.names(s1_vh_ts)
+s1_vh_ts=s1_vh_ts[-1,]
+s1_vh_ts$date=as.POSIXct(s1_vh_ts$date,tz=timezone)
+
+#s1_vv_ts=data.frame(s1_vv=t(terra::extract(s1_vv,pt_utm)))
+s1_vv_ts=data.frame(s1_vv=t(terra::extract(s1_vv,pt_buffer)))
+s1_vv_ts["date"]=row.names(s1_vv_ts)
+s1_vv_ts=s1_vv_ts[-1,]
+s1_vv_ts$date=as.POSIXct(s1_vv_ts$date,tz=timezone)
+
+
+plot(NA,NA,xlim=c(min(s1_vv_ts$date),max(s1_vv_ts$date)),ylim=c(0,0.6),axes=F,xlab="",ylab="")
+xticks=seq(as.POSIXct(sprintf("%s-01-01",min(as.numeric(format(s1_vv_ts$date,format="%Y")))),tz=timezone),
+           as.POSIXct(sprintf("%s-12-31",max(as.numeric(format(s1_vv_ts$date,format="%Y")))),tz=timezone),
+           by="6 months")
+axis(side=1,at=xticks,labels=format(xticks,format="%Y-%m"))
+axis(side=2,las=1)
+for (i in 1:(ncol(s1_vv_ts)-1)){
+  points(s1_vv_ts$date,s1_vv_ts[,i],pch=20)
+}
+abline(v=xticks)
+
+
+
+plot(NA,NA,xlim=c(min(s1_vh_ts$date),max(s1_vh_ts$date)),ylim=c(0,0.3),axes=F,xlab="",ylab="")
+xticks=seq(as.POSIXct(sprintf("%s-01-01",min(as.numeric(format(s1_vh_ts$date,format="%Y")))),tz=timezone),
+           as.POSIXct(sprintf("%s-12-31",max(as.numeric(format(s1_vh_ts$date,format="%Y")))),tz=timezone),
+           by="6 months")
+axis(side=1,at=xticks,labels=format(xticks,format="%Y-%m"))
+axis(side=2,las=1)
+for (i in 1:(ncol(s1_vh_ts)-1)){
+  points(s1_vh_ts$date,s1_vh_ts[,i],pch=20)
+}
+abline(v=xticks)
+
+
+
+plot(NA,NA,xlim=c(min(s1_vh_ts$date),max(s1_vh_ts$date)),ylim=c(0,2.3),axes=F,xlab="",ylab="")
+xticks=seq(as.POSIXct(sprintf("%s-01-01",min(as.numeric(format(s1_vh_ts$date,format="%Y")))),tz=timezone),
+           as.POSIXct(sprintf("%s-12-31",max(as.numeric(format(s1_vh_ts$date,format="%Y")))),tz=timezone),
+           by="6 months")
+axis(side=1,at=xticks,labels=format(xticks,format="%Y-%m"))
+axis(side=2,las=1)
+for (i in 1:(ncol(s1_vh_ts)-1)){
+  points(s1_vh_ts$date,(4*s1_vh_ts[,i])/(s1_vh_ts[,i]+s1_vv_ts[,i]),pch=20)
+}
+abline(v=xticks)
+
+
+
+s1_vh_ts_mean=data.frame(date=s1_vh_ts$date,
+                         vh_mean=rowMeans(s1_vh_ts[1:(ncol(s1_vh_ts)-1)],na.rm=T),
+                         vh_median=apply(s1_vh_ts[1:(ncol(s1_vh_ts)-1)],1,FUN="median",na.rm=T)
+                         )
+
+plot(s1_vh_ts_mean$date,s1_vh_ts_mean$vh_mean,type="o")
+lines(s1_vh_ts_mean$date,s1_vh_ts_mean$vh_median,col="red")
+
+
+s1_vv_ts_mean=data.frame(date=s1_vv_ts$date,
+                         vv_mean=rowMeans(s1_vv_ts[1:(ncol(s1_vv_ts)-1)],na.rm=T),
+                         vv_median=apply(s1_vv_ts[1:(ncol(s1_vv_ts)-1)],1,FUN="median",na.rm=T)
+                         )
+plot(s1_vv_ts_mean$date,s1_vv_ts_mean$vv_mean,type="o")
+lines(s1_vv_ts_mean$date,s1_vv_ts_mean$vv_median,col="red")
+
+s1_rvi_mean=data.frame(date=s1_vv_ts$date,
+                       rvi_mean=(4*s1_vh_ts_mean$vh_mean)/(s1_vh_ts_mean$vh_mean+s1_vv_ts_mean$vv_mean))
+plot(s1_rvi_mean$date,s1_rvi_mean$rvi_mean,type="o")
+
+
+```
+
+
+***
+### Apply Rbeast
+
+```{r rbeast,echo=F,warning=F,error=F}
+
+results=map(s1_vh_ts[,-ncol(s1_vh_ts)],~beast(.x,period=12))
+plot(results[[3]])
+
+results=map(data.frame(s1_vh_ts_mean[,2]),~beast(.x,period=365.25))
+plot(results[[1]])
+
+results=map(data.frame(s1_vv_ts_mean[,2]),~beast(.x,period=365.25,scp.minmax=10))
+plot(results[[1]])
+
+results=map(data.frame(s1_rvi_mean[,2]),~beast(.x,period=365.25))
+plot(results[[1]])
+
+# # Plot only the trend component
+# plot(results[[1]], which = "trend")
+# 
+# # Plot only the seasonal component
+# plot(results[[1]], which = "season")
+# 
+# # Plot changepoint probabilities
+# plot(results[[1]], which = "cp")
+# 
+# changepoints <- lapply(results, function(res) res$trend$cp)  # trend changepoints
+# seasonals <- lapply(results, function(res) res$season$cp)    # seasonal changepoints
+
+
+```
+
+
